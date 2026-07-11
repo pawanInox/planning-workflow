@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { taskToPrompt } from '../shared/parse'
-import type { Task } from '../shared/parse'
+import { taskToPrompt } from '../../shared/parse'
+import type { Task } from '../../shared/parse'
 
 export function CopyPromptButton({ task }: { task: Task }) {
   const [copied, setCopied] = useState(false)

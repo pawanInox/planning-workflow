@@ -2,7 +2,7 @@
 
 Paste a markdown plan → review tasks card-by-card (Focus deck or List) → ship the done ones to Linear. Projects and tasks persist in MongoDB.
 
-- Frontend: React + Vite (`src/`), dev server on 5173, proxies `/api` to the API.
+- Frontend: React + Vite (`src/`), dev server on 5173, proxies `/api` to the API. Frontend code follows the conventions from https://github.com/claudiocebpaz/vite-react-best-practices: pages colocated under `src/pages/` (one per step, lazy-loaded via `React.lazy` + `Suspense`), shared UI in `src/components/`, all server calls in `src/lib/api.ts` (no raw `fetch` in components; swap for React Query if caching ever matters), named exports only (no default exports), memoize strategically rather than by default. Keep new frontend code within this structure.
 - API: Express (`server/`), port 3001 (`PORT` env). Clean architecture: `server/src/domain` (entities + repository port) → `application` (use-cases, validation) → `infrastructure` (Mongoose) → `http` (router). `server/index.ts` is the composition root.
 - Shared parser/serializer: `shared/parse.ts` (`parsePlan` ⇄ `planToMarkdown`).
 - Run: `npm run dev` (needs `MONGODB_URI` in `.env` for persistence) or `docker compose up --build` (app on 5173, Mongo browsable on 27019).

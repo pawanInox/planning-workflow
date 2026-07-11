@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Task } from '../shared/parse'
+import type { Task } from '../../shared/parse'
 import { Section, DepChips, CopyPromptButton, cardHue, taskIcon, taskMemeQuery } from './TaskCard'
 
 const reducedMotion = () =>
