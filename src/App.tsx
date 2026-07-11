@@ -81,6 +81,12 @@ export function App() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // deep link: /?project=<id> opens that project straight into review
+  useEffect(() => {
+    const pid = new URLSearchParams(window.location.search).get('project')
+    if (pid) openProject(pid)
+  }, [])
+
   useEffect(() => {
     fetch('/api/teams')
       .then(async r => { if (!r.ok) throw new Error((await r.json()).error); return r.json() })

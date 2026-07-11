@@ -118,12 +118,33 @@ export function Section({ name, text, tone, large = false }: { name: string; tex
       </p>
       {text.split('\n').map((line, i) => {
         const kw = line.match(/^(Scenario|Before|After):\s*(.*)$/)
-        return kw ? (
+        if (kw) return (
           <p key={i} style={{ ...body, margin: '8px 0 0' }}>
             <span style={{ fontWeight: 600, color: c.color }}>{kw[1]}:</span> <InlineCode text={kw[2]} />
           </p>
-        ) : (
-          <p key={i} style={{ ...body, margin: 0 }}>
+        )
+        const step = line.match(/^(\d+)[.)]\s+(.*)$/)
+        if (step) return (
+          <p key={i} style={{ ...body, margin: '8px 0 0', display: 'flex', gap: 8 }}>
+            <span style={{
+              flexShrink: 0, width: 20, height: 20, marginTop: 2, borderRadius: 999,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, color: c.color,
+              background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
+            }}>
+              {step[1]}
+            </span>
+            <span style={{ minWidth: 0 }}><InlineCode text={step[2]} /></span>
+          </p>
+        )
+        const bullet = line.match(/^[-•*]\s+(.*)$/)
+        if (bullet) return (
+          <p key={i} style={{ ...body, margin: '4px 0 0', paddingLeft: 28, textIndent: -12 }}>
+            <span style={{ color: c.color, fontWeight: 700 }}>•</span> <InlineCode text={bullet[1]} />
+          </p>
+        )
+        return (
+          <p key={i} style={{ ...body, margin: i === 0 ? 0 : '6px 0 0' }}>
             <InlineCode text={line} />
           </p>
         )

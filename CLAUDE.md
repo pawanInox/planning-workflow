@@ -14,6 +14,8 @@ Base URL: `http://localhost:3001` with `npm run dev`. With `docker compose up`, 
 
 Use this to read or edit a user's plan while they review it in the app — the review screen polls every 3 s and reflects external task edits automatically.
 
+**Deep link**: `http://localhost:5173/?project=<id>` opens that project directly in review. After creating a project via `POST /api/projects`, hand the user this URL (the `/linear-plan` skill does this automatically after planning).
+
 | Method & path | Body | Returns |
 |---|---|---|
 | `GET /api/projects` | — | `[{ id, title, taskCount, doneCount, updatedAt }]` |
