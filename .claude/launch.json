@@ -12,8 +12,10 @@
     },
     {
       "name": "web-preview",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "env",
       "runtimeArgs": [
+        "API_ORIGIN=http://localhost:3002",
+        "npx",
         "vite",
         "--port",
         "5199",

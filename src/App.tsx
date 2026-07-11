@@ -70,8 +70,8 @@ export function App() {
   const [projectId, setProjectId] = useState<string | null>(null)
   const [taskIds, setTaskIds] = useState<(string | undefined)[]>([])
   const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([])
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [saveError, setSaveError] = useState('')
+  const saving = useRef(false)
   const syncedDone = useRef<Set<number>>(new Set())
 
   function copyFormatPrompt() {
@@ -99,7 +99,9 @@ export function App() {
   }, [step])
 
   async function saveProject() {
-    setSaveState('saving'); setSaveError('')
+    if (saving.current) return
+    saving.current = true
+    setSaveError('')
     try {
       const payload = {
         title: planTitle || 'Untitled plan',
@@ -121,11 +123,10 @@ export function App() {
       setTaskIds(tasks.map(t => (t.errors.length ? undefined : p.tasks[j++]?.id)))
       syncedDone.current = new Set(done)
       setProjectId(p.id)
-      setSaveState('saved')
-      setTimeout(() => setSaveState('idle'), 2000)
     } catch (e: any) {
       setSaveError(String(e.message ?? e))
-      setSaveState('idle')
+    } finally {
+      saving.current = false
     }
   }
 
@@ -275,7 +276,14 @@ export function App() {
               {tasks.some(t => t.errors.length) ? ` · ${tasks.filter(t => t.errors.length).length} incomplete` : ''}
             </span>
           )}
-          <button className="btn-primary" disabled={tasks.length === 0} onClick={() => setStep('review')}>
+          <button
+            className="btn-primary"
+            disabled={tasks.length === 0}
+            onClick={() => {
+              void saveProject() // auto-create (or update) the project; review doesn't wait on it
+              setStep('review')
+            }}
+          >
             Start review →
           </button>
         </div>
@@ -298,15 +306,7 @@ export function App() {
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {saveError && <span style={{ fontSize: 12, color: 'var(--warn)' }}>⚠ {saveError}</span>}
-            <button
-              className="btn-ghost"
-              onClick={saveProject}
-              disabled={saveState === 'saving'}
-              title="Save this plan and its review progress"
-            >
-              {saveState === 'saved' ? '✓ Saved' : '💾 Save'}
-            </button>
+            {saveError && <span style={{ fontSize: 12, color: 'var(--warn)' }} title={saveError}>⚠ not saved</span>}
             <ThemeToggle />
             <button className={`btn-ghost${view === 'focus' ? ' active' : ''}`} onClick={() => setView('focus')}>Focus</button>
             <button className={`btn-ghost${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>List</button>
