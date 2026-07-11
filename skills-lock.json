@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "express-typescript-api-best-practices": {
+      "source": "MILLERMARRU/express-typescript-api-best-practices",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "477f93d8e81a26b62218ca283904711184cd6886ae0ea7b745a6c08e98c9729b"
+    },
+    "vite-react-best-practices": {
+      "source": "claudiocebpaz/vite-react-best-practices",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "91b1ffc84b35ea55b852ab97f85df226948e9d157e7cda0893fa493a91222ea4"
+    }
+  }
+}

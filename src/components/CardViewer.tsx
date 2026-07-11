@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Task } from '../../shared/parse'
+import { api } from '../lib/api'
 import { Section, DepChips, CopyPromptButton, cardHue, taskIcon, taskMemeQuery } from './TaskCard'
 
 const reducedMotion = () =>
@@ -16,8 +17,7 @@ function Meme({ query, fallback }: { query: string; fallback?: ReactNode }) {
   useEffect(() => {
     let alive = true
     setState('loading'); setMeme(null)
-    fetch(`/api/meme?q=${encodeURIComponent(query)}`)
-      .then(r => (r.ok ? r.json() : Promise.reject()))
+    api.getMeme(query)
       .then(m => { if (alive && m.url) { setMeme(m); setState('ok') } else if (alive) setState('none') })
       .catch(() => { if (alive) setState('none') })
     return () => { alive = false }

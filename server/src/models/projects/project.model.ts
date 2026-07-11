@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
-import type { Project } from '../../../domain/project-repository.ts'
+import type { Project } from '../entities.ts'
 
 const projectSchema = new Schema(
   { title: { type: String, required: true } },

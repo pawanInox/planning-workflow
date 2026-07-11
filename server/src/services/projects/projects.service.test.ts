@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { makeProjectUseCases, NotFoundError, ValidationError } from './project-use-cases.ts'
-import type { NewTask, Project, ProjectRepository, TaskEntity } from '../domain/project-repository.ts'
-import type { TaskRepository } from '../domain/task-repository.ts'
+import { makeProjectsService } from './projects.service.ts'
+import { NotFoundError } from '../errors.ts'
+import type { NewTask, Project, ProjectRepository, TaskEntity, TaskRepository } from '../../repositories/ports.ts'
 
 function fakeRepo(): { projects: ProjectRepository; tasks: TaskRepository; taskMap: Map<string, TaskEntity> } {
   let nextId = 1
@@ -78,8 +78,8 @@ const task = (over: Partial<NewTask> = {}): NewTask =>
   ({ title: 't', problem: 'p', todo: 'd', outcome: 'o', ...over })
 
 test('createProject applies ids, order, and defaults', async () => {
-  const uc = makeProjectUseCases(fakeRepo())
-  const p = await uc.createProject({ title: 'P', tasks: [task({ title: 'a' }), task({ title: 'b', done: true })] })
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({ title: 'P', tasks: [task({ title: 'a' }), task({ title: 'b', done: true })] })
   assert.equal(p.tasks.length, 2)
   assert.deepEqual(p.tasks.map(t => t.order), [0, 1])
   assert.ok(p.tasks.every(t => t.id))
@@ -87,39 +87,31 @@ test('createProject applies ids, order, and defaults', async () => {
   assert.deepEqual(p.tasks[0].dependsOn, [])
 })
 
-test('createProject rejects an empty todo', async () => {
-  const uc = makeProjectUseCases(fakeRepo())
-  await assert.rejects(
-    uc.createProject({ title: 'P', tasks: [task(), task({ todo: ' ' })] }),
-    ValidationError,
-  )
-})
-
 test('getProject on unknown id throws NotFoundError', async () => {
-  const uc = makeProjectUseCases(fakeRepo())
-  await assert.rejects(uc.getProject('nope'), NotFoundError)
+  const svc = makeProjectsService(fakeRepo())
+  await assert.rejects(svc.getProject('nope'), NotFoundError)
 })
 
 test('updateTask flips done', async () => {
-  const uc = makeProjectUseCases(fakeRepo())
-  const p = await uc.createProject({ title: 'P', tasks: [task()] })
-  const t = await uc.updateTask(p.id, p.tasks[0].id, { done: true })
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({ title: 'P', tasks: [task()] })
+  const t = await svc.updateTask(p.id, p.tasks[0].id, { done: true })
   assert.equal(t.done, true)
-  assert.equal((await uc.getProject(p.id)).tasks[0].done, true)
+  assert.equal((await svc.getProject(p.id)).tasks[0].done, true)
 })
 
 test('updateTask with a task id from another project throws NotFoundError', async () => {
-  const uc = makeProjectUseCases(fakeRepo())
-  const a = await uc.createProject({ title: 'A', tasks: [task()] })
-  const b = await uc.createProject({ title: 'B', tasks: [task()] })
-  await assert.rejects(uc.updateTask(a.id, b.tasks[0].id, { done: true }), NotFoundError)
+  const svc = makeProjectsService(fakeRepo())
+  const a = await svc.createProject({ title: 'A', tasks: [task()] })
+  const b = await svc.createProject({ title: 'B', tasks: [task()] })
+  await assert.rejects(svc.updateTask(a.id, b.tasks[0].id, { done: true }), NotFoundError)
 })
 
 test('deleteProject cascades its tasks', async () => {
   const repo = fakeRepo()
-  const uc = makeProjectUseCases(repo)
-  const p = await uc.createProject({ title: 'P', tasks: [task(), task({ title: 'u' })] })
-  await uc.deleteProject(p.id)
+  const svc = makeProjectsService(repo)
+  const p = await svc.createProject({ title: 'P', tasks: [task(), task({ title: 'u' })] })
+  await svc.deleteProject(p.id)
   assert.equal(repo.taskMap.size, 0)
-  await assert.rejects(uc.getProject(p.id), NotFoundError)
+  await assert.rejects(svc.getProject(p.id), NotFoundError)
 })

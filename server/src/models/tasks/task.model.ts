@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
-import type { TaskEntity } from '../../../domain/project-repository.ts'
+import type { TaskEntity } from '../entities.ts'
 
 const taskSchema = new Schema(
   {

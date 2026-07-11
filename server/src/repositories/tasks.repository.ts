@@ -1,7 +1,7 @@
-import type { NewTask, TaskEntity, TaskRepository } from '../../../domain/task-repository.ts'
-import { oid } from '../db.ts'
-import { ProjectModel } from '../models/project-model.ts'
-import { TaskModel, toTask } from '../models/task-model.ts'
+import type { NewTask, TaskEntity, TaskRepository } from './ports.ts'
+import { oid } from '../config/db.ts'
+import { ProjectModel } from '../models/projects/project.model.ts'
+import { TaskModel, toTask } from '../models/tasks/task.model.ts'
 
 export class MongooseTaskRepository implements TaskRepository {
   async addTask(projectId: string, task: NewTask): Promise<TaskEntity | null> {

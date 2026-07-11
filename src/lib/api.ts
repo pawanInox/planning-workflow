@@ -9,13 +9,18 @@ export type ProjectWithTasks = { id: string; title: string; tasks: SavedTask[] }
 export type TaskPayload = Omit<SavedTask, 'id'>
 export type Team = { id: string; name: string; key: string }
 export type CreatedIssue = { title: string; url: string }
+export type Meme = { url: string; pageUrl: string; title: string }
 
-async function json<T>(r: Response): Promise<T> {
-  if (!r.ok) throw new Error((await r.json()).error ?? `request failed (${r.status})`)
-  return r.json()
+const BASE = '/api/v1'
+
+// server responses use the envelope { status: 'ok'|'error', message, data }
+async function unwrap<T>(r: Response): Promise<T> {
+  const body = await r.json()
+  if (!r.ok || body.status === 'error') throw new Error(body.message ?? `request failed (${r.status})`)
+  return body.data as T
 }
 
-const post = (method: string, body: unknown) => ({
+const send = (method: string, body: unknown) => ({
   method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
@@ -24,28 +29,29 @@ const post = (method: string, body: unknown) => ({
 // ponytail: plain fetch wrappers — swap for React Query/SWR if caching/retries ever matter
 export const api = {
   listProjects: (): Promise<ProjectSummary[]> =>
-    fetch('/api/projects').then(r => (r.ok ? r.json() : [])).catch(() => []),
+    fetch(`${BASE}/projects`).then(r => unwrap<ProjectSummary[]>(r)).catch(() => []),
 
   getProject: (id: string): Promise<ProjectWithTasks> =>
-    fetch(`/api/projects/${id}`).then(r => json<ProjectWithTasks>(r)),
+    fetch(`${BASE}/projects/${id}`).then(r => unwrap<ProjectWithTasks>(r)),
 
   createProject: (title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
-    fetch('/api/projects', post('POST', { title, tasks })).then(r => json<ProjectWithTasks>(r)),
+    fetch(`${BASE}/projects`, send('POST', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
 
   updateProject: (id: string, title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
-    fetch(`/api/projects/${id}`, post('PUT', { title, tasks })).then(r => json<ProjectWithTasks>(r)),
+    fetch(`${BASE}/projects/${id}`, send('PUT', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
 
-  deleteProject: async (id: string): Promise<void> => {
-    const r = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
-    if (!r.ok) throw new Error((await r.json()).error ?? `delete failed (${r.status})`)
-  },
+  deleteProject: (id: string): Promise<void> =>
+    fetch(`${BASE}/projects/${id}`, { method: 'DELETE' }).then(r => unwrap<void>(r)),
 
   setTaskDone: (projectId: string, taskId: string, done: boolean): Promise<Response> =>
-    fetch(`/api/projects/${projectId}/tasks/${taskId}`, post('PATCH', { done })),
+    fetch(`${BASE}/projects/${projectId}/tasks/${taskId}`, send('PATCH', { done })),
+
+  getMeme: (query: string): Promise<Meme> =>
+    fetch(`${BASE}/memes?q=${encodeURIComponent(query)}`).then(r => unwrap<Meme>(r)),
 
   listTeams: (): Promise<Team[]> =>
-    fetch('/api/teams').then(r => json<Team[]>(r)),
+    fetch(`${BASE}/teams`).then(r => unwrap<Team[]>(r)),
 
   createIssues: (teamId: string, tasks: unknown[]): Promise<{ created: CreatedIssue[]; relationErrors?: string[] }> =>
-    fetch('/api/issues', post('POST', { teamId, tasks })).then(r => json(r)),
+    fetch(`${BASE}/issues`, send('POST', { teamId, tasks })).then(r => unwrap(r)),
 }

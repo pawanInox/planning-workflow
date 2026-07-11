@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,api \"vite\" \"tsx watch server/index.ts\"",
-    "test": "tsx --test shared/parse.test.ts server/src/application/project-use-cases.test.ts",
+    "test": "tsx --test shared/parse.test.ts server/src/services/projects/projects.service.test.ts server/src/schemas/projects.schema.test.ts",
     "build": "vite build"
   },
   "dependencies": {
@@ -12,7 +12,8 @@
     "express": "^4.21.0",
     "mongoose": "^9.7.4",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
