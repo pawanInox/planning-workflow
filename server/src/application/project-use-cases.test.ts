@@ -2,8 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { makeProjectUseCases, NotFoundError, ValidationError } from './project-use-cases.ts'
 import type { NewTask, Project, ProjectRepository, TaskEntity } from '../domain/project-repository.ts'
+import type { TaskRepository } from '../domain/task-repository.ts'
 
-function fakeRepo(): ProjectRepository & { taskMap: Map<string, TaskEntity> } {
+function fakeRepo(): { projects: ProjectRepository; tasks: TaskRepository; taskMap: Map<string, TaskEntity> } {
   let nextId = 1
   const projects = new Map<string, Project>()
   const taskMap = new Map<string, TaskEntity>()
@@ -17,8 +18,7 @@ function fakeRepo(): ProjectRepository & { taskMap: Map<string, TaskEntity> } {
   const tasksOf = (projectId: string) =>
     [...taskMap.values()].filter(t => t.projectId === projectId).sort((a, b) => a.order - b.order)
 
-  return {
-    taskMap,
+  const projectsRepo: ProjectRepository = {
     async create({ title, tasks }) {
       const p: Project = { id: id(), title, createdAt: new Date(), updatedAt: new Date() }
       projects.set(p.id, p)
@@ -50,6 +50,8 @@ function fakeRepo(): ProjectRepository & { taskMap: Map<string, TaskEntity> } {
       for (const t of tasksOf(pid)) taskMap.delete(t.id)
       return true
     },
+  }
+  const tasksRepo: TaskRepository = {
     async addTask(pid, task) {
       if (!projects.has(pid)) return null
       const order = tasksOf(pid).length
@@ -69,6 +71,7 @@ function fakeRepo(): ProjectRepository & { taskMap: Map<string, TaskEntity> } {
       return taskMap.delete(tid)
     },
   }
+  return { projects: projectsRepo, tasks: tasksRepo, taskMap }
 }
 
 const task = (over: Partial<NewTask> = {}): NewTask =>

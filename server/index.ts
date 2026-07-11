@@ -3,7 +3,9 @@ import { LinearClient, LinearDocument } from '@linear/sdk'
 import { taskToDescription, type Task } from '../shared/parse.ts'
 import { makeProjectUseCases } from './src/application/project-use-cases.ts'
 import { makeProjectRouter } from './src/http/project-router.ts'
-import { connectDb, MongooseProjectRepository } from './src/infrastructure/mongoose-project-repository.ts'
+import { connectDb } from './src/infrastructure/mongo/db.ts'
+import { MongooseProjectRepository } from './src/infrastructure/mongo/repositories/mongoose-project-repository.ts'
+import { MongooseTaskRepository } from './src/infrastructure/mongo/repositories/mongoose-task-repository.ts'
 
 try { process.loadEnvFile() } catch { /* no .env yet */ }
 
@@ -19,7 +21,10 @@ let projectsReady = false
 if (mongoUri) {
   try {
     await connectDb(mongoUri)
-    app.use('/api/projects', makeProjectRouter(makeProjectUseCases(new MongooseProjectRepository())))
+    app.use('/api/projects', makeProjectRouter(makeProjectUseCases({
+      projects: new MongooseProjectRepository(),
+      tasks: new MongooseTaskRepository(),
+    })))
     projectsReady = true
     console.log('mongo connected')
   } catch (e: any) {

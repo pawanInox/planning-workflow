@@ -1,9 +1,7 @@
 import { Router, type Request, type Response } from 'express'
-import { makeProjectUseCases, NotFoundError, ValidationError } from '../application/project-use-cases.ts'
+import { NotFoundError, ValidationError, type ProjectUseCases } from '../application/project-use-cases.ts'
 
-type UseCases = ReturnType<typeof makeProjectUseCases>
-
-export function makeProjectRouter(uc: UseCases): Router {
+export function makeProjectRouter(uc: ProjectUseCases): Router {
   const r = Router()
 
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) =>

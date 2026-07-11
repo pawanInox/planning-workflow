@@ -73,6 +73,7 @@ export function App() {
   const [saveError, setSaveError] = useState('')
   const saving = useRef(false)
   const syncedDone = useRef<Set<number>>(new Set())
+  const serverMd = useRef('') // serialized server state; poll re-hydrates only when it changes
 
   function copyFormatPrompt() {
     navigator.clipboard.writeText(FORMAT_PROMPT + md)
@@ -122,6 +123,7 @@ export function App() {
       let j = 0
       setTaskIds(tasks.map(t => (t.errors.length ? undefined : p.tasks[j++]?.id)))
       syncedDone.current = new Set(done)
+      serverMd.current = planToMarkdown(planTitle || 'Untitled plan', p.tasks)
       setProjectId(p.id)
     } catch (e: any) {
       setSaveError(String(e.message ?? e))
@@ -136,11 +138,13 @@ export function App() {
       if (!r.ok) throw new Error((await r.json()).error)
       const p: { id: string; title: string; tasks: SavedTask[] } = await r.json()
       const doneSet = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
-      setMd(planToMarkdown(p.title, p.tasks))
+      const fresh = planToMarkdown(p.title, p.tasks)
+      setMd(fresh)
       setDone(doneSet)
       setCreated([])
       setTaskIds(p.tasks.map(t => t.id))
       syncedDone.current = doneSet
+      serverMd.current = fresh
       setProjectId(p.id)
       setSaveError('')
       setStep('review')
@@ -148,6 +152,28 @@ export function App() {
       setError(String(e.message ?? e))
     }
   }
+
+  // reflect external edits (e.g. Claude PATCHing tasks via the API) while reviewing
+  useEffect(() => {
+    if (step !== 'review' || !projectId) return
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/projects/${projectId}`)
+        if (!r.ok) return
+        const p: { id: string; title: string; tasks: SavedTask[] } = await r.json()
+        const fresh = planToMarkdown(p.title, p.tasks)
+        if (fresh === serverMd.current) return
+        // ponytail: a done-toggle PATCH racing an external edit can be briefly overwritten; refetch-after-write if it ever matters
+        const doneSet = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
+        serverMd.current = fresh
+        setMd(fresh)
+        setDone(doneSet)
+        syncedDone.current = doneSet
+        setTaskIds(p.tasks.map(t => t.id))
+      } catch { /* api unreachable — keep reviewing locally */ }
+    }, 3000)
+    return () => clearInterval(poll)
+  }, [step, projectId])
 
   useEffect(() => {
     if (!projectId) return

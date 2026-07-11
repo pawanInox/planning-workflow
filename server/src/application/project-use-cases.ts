@@ -1,7 +1,20 @@
-import type { NewTask, ProjectRepository } from '../domain/project-repository.ts'
+import type { NewTask, ProjectRepository, ProjectSummary, ProjectWithTasks, TaskEntity } from '../domain/project-repository.ts'
+import type { TaskRepository } from '../domain/task-repository.ts'
 
 export class ValidationError extends Error {}
 export class NotFoundError extends Error {}
+
+/** The port the HTTP layer depends on; implemented by makeProjectUseCases over the repository ports. */
+export interface ProjectUseCases {
+  createProject(data: { title?: unknown; tasks?: unknown }): Promise<ProjectWithTasks>
+  listProjects(): Promise<ProjectSummary[]>
+  getProject(id: string): Promise<ProjectWithTasks>
+  updateProject(id: string, data: { title?: unknown; tasks?: unknown }): Promise<ProjectWithTasks>
+  deleteProject(id: string): Promise<void>
+  addTask(projectId: string, task: unknown): Promise<TaskEntity>
+  updateTask(projectId: string, taskId: string, patch: unknown): Promise<TaskEntity>
+  removeTask(projectId: string, taskId: string): Promise<void>
+}
 
 const isFilled = (s: unknown): s is string => typeof s === 'string' && s.trim() !== ''
 const TEXT_FIELDS = ['title', 'problem', 'todo', 'outcome'] as const
@@ -23,18 +36,18 @@ function validateTask(t: any): NewTask {
   }
 }
 
-export function makeProjectUseCases(repo: ProjectRepository) {
+export function makeProjectUseCases({ projects, tasks }: { projects: ProjectRepository; tasks: TaskRepository }): ProjectUseCases {
   return {
     async createProject(data: { title?: unknown; tasks?: unknown }) {
       if (!isFilled(data.title)) throw new ValidationError('project title must be a non-empty string')
       const tasks = (Array.isArray(data.tasks) ? data.tasks : []).map(validateTask)
-      return repo.create({ title: data.title.trim(), tasks })
+      return projects.create({ title: data.title.trim(), tasks })
     },
 
-    listProjects: () => repo.list(),
+    listProjects: () => projects.list(),
 
     async getProject(id: string) {
-      const p = await repo.getById(id)
+      const p = await projects.getById(id)
       if (!p) throw new NotFoundError(`no project "${id}"`)
       return p
     },
@@ -49,17 +62,17 @@ export function makeProjectUseCases(repo: ProjectRepository) {
         if (!Array.isArray(data.tasks)) throw new ValidationError('tasks must be an array')
         patch.tasks = data.tasks.map(validateTask)
       }
-      const p = await repo.update(id, patch)
+      const p = await projects.update(id, patch)
       if (!p) throw new NotFoundError(`no project "${id}"`)
       return p
     },
 
     async deleteProject(id: string) {
-      if (!(await repo.delete(id))) throw new NotFoundError(`no project "${id}"`)
+      if (!(await projects.delete(id))) throw new NotFoundError(`no project "${id}"`)
     },
 
     async addTask(projectId: string, task: unknown) {
-      const created = await repo.addTask(projectId, validateTask(task))
+      const created = await tasks.addTask(projectId, validateTask(task))
       if (!created) throw new NotFoundError(`no project "${projectId}"`)
       return created
     },
@@ -81,13 +94,13 @@ export function makeProjectUseCases(repo: ProjectRepository) {
         if (typeof patch.done !== 'boolean') throw new ValidationError('done must be a boolean')
         clean.done = patch.done
       }
-      const updated = await repo.updateTask(projectId, taskId, clean)
+      const updated = await tasks.updateTask(projectId, taskId, clean)
       if (!updated) throw new NotFoundError(`no task "${taskId}" in project "${projectId}"`)
       return updated
     },
 
     async removeTask(projectId: string, taskId: string) {
-      if (!(await repo.removeTask(projectId, taskId))) {
+      if (!(await tasks.removeTask(projectId, taskId))) {
         throw new NotFoundError(`no task "${taskId}" in project "${projectId}"`)
       }
     },
