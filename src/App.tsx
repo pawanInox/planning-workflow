@@ -58,7 +58,8 @@ Here is the plan to reformat:
 
 export function App() {
   const [md, setMd] = useState('')
-  const [step, setStep] = useState<'input' | 'review' | 'create'>('input')
+  const [step, setStep] = useState<'input' | 'review' | 'create' | 'projects'>('input')
+  const [cameFrom, setCameFrom] = useState<'input' | 'projects'>('input')
   const [view, setView] = useState<'focus' | 'list'>('focus')
   const [done, setDone] = useState<Set<number>>(new Set())
   const [teams, setTeams] = useState<Team[]>([])
@@ -81,11 +82,24 @@ export function App() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // deep link: /?project=<id> opens that project straight into review
+  // deep link: /?project=<id> opens that project straight into review, /?page=projects opens the list
   useEffect(() => {
-    const pid = new URLSearchParams(window.location.search).get('project')
+    const params = new URLSearchParams(window.location.search)
+    const pid = params.get('project')
     if (pid) openProject(pid)
+    else if (params.get('page') === 'projects') setStep('projects')
   }, [])
+
+  // mirror the current page into the URL so reload and copy-link restore it
+  useEffect(() => {
+    const url =
+      step === 'projects' ? '/?page=projects'
+      : (step === 'review' || step === 'create') && projectId ? `/?project=${projectId}`
+      : '/'
+    if (window.location.pathname + window.location.search !== url) {
+      window.history.replaceState(null, '', url)
+    }
+  }, [step, projectId])
 
   useEffect(() => {
     fetch('/api/teams')
@@ -98,12 +112,33 @@ export function App() {
   const shippable = [...done].sort((a, b) => a - b).map(i => tasks[i]).filter(t => t && t.errors.length === 0)
 
   useEffect(() => {
-    if (step !== 'input') return
+    if (step !== 'input' && step !== 'projects') return
     fetch('/api/projects')
       .then(r => (r.ok ? r.json() : []))
       .then(setSavedProjects)
       .catch(() => setSavedProjects([]))
   }, [step])
+
+  const [listError, setListError] = useState('')
+
+  function newPlan() {
+    setMd(''); setDone(new Set()); setCreated([])
+    setProjectId(null); setTaskIds([])
+    syncedDone.current = new Set(); serverMd.current = ''
+    setSaveError('')
+    setStep('input')
+  }
+  async function deleteProject(p: ProjectSummary) {
+    if (!window.confirm(`Delete "${p.title}" and its ${p.taskCount} task${p.taskCount === 1 ? '' : 's'}?`)) return
+    try {
+      const r = await fetch(`/api/projects/${p.id}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error((await r.json()).error)
+      setSavedProjects(prev => prev.filter(x => x.id !== p.id))
+      if (projectId === p.id) { setProjectId(null); setTaskIds([]) }
+    } catch (e: any) {
+      setListError(String(e.message ?? e))
+    }
+  }
 
   async function saveProject() {
     if (saving.current) return
@@ -153,6 +188,7 @@ export function App() {
       serverMd.current = fresh
       setProjectId(p.id)
       setSaveError('')
+      setCameFrom('projects')
       setStep('review')
     } catch (e: any) {
       setError(String(e.message ?? e))
@@ -224,7 +260,10 @@ export function App() {
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100vh' }}>
         <span className="blob" style={{ width: 320, height: 320, top: -80, right: -60, background: 'var(--lime)' }} />
         <span className="blob" style={{ width: 280, height: 280, bottom: -60, left: -80, background: 'var(--card-hue-1)' }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 16 }}>
+          {savedProjects.length > 0 && (
+            <button className="btn-ghost" onClick={() => setStep('projects')}>📁 Projects</button>
+          )}
           <ThemeToggle />
         </div>
         <header style={{ padding: '8px 0 0', textAlign: 'center' }}>
@@ -246,29 +285,6 @@ export function App() {
           className="card"
           style={{ flex: 1, minHeight: 320, width: '100%', fontFamily: 'ui-monospace, monospace', fontSize: 12.5, lineHeight: 1.7, resize: 'none' }}
         />
-
-        {savedProjects.length > 0 && (
-          <div className="card">
-            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-              Saved projects
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {savedProjects.map(p => (
-                <button
-                  key={p.id}
-                  className="btn-ghost"
-                  onClick={() => openProject(p.id)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left' }}
-                >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                  <span className="pill" style={{ color: 'var(--badge-text)', background: 'var(--badge-bg)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {p.doneCount}/{p.taskCount} done · {new Date(p.updatedAt).toLocaleDateString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {tasks.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -313,12 +329,67 @@ export function App() {
             disabled={tasks.length === 0}
             onClick={() => {
               void saveProject() // auto-create (or update) the project; review doesn't wait on it
+              setCameFrom('input')
               setStep('review')
             }}
           >
             Start review →
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (step === 'projects') {
+    return (
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 0 10px', borderBottom: '1px solid var(--border)',
+        }}>
+          <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>📁 Projects</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <button className="btn-primary" onClick={newPlan}>+ New plan</button>
+          </div>
+        </header>
+
+        {savedProjects.length === 0 ? (
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', margin: '32px 0' }}>
+            No saved projects yet — paste a plan and start a review to create one.
+          </p>
+        ) : (
+          <div className="card">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {savedProjects.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => openProject(p.id)}
+                    style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, textAlign: 'left' }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                    <span className="pill" style={{ color: 'var(--badge-text)', background: 'var(--badge-bg)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {p.doneCount}/{p.taskCount} done · {new Date(p.updatedAt).toLocaleDateString()}
+                    </span>
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => deleteProject(p)}
+                    title={`Delete "${p.title}"`}
+                    aria-label={`Delete ${p.title}`}
+                    style={{ height: 28, fontSize: 12, padding: '0 10px', flexShrink: 0 }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {listError && <div className="card" style={{ borderColor: 'var(--danger-border)', color: 'var(--danger)', fontSize: 13 }}>{listError}</div>}
       </div>
     )
   }
@@ -332,7 +403,9 @@ export function App() {
           padding: '14px 0 10px', borderBottom: '1px solid var(--border)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <button className="btn-ghost" onClick={() => setStep('input')}>← Edit plan</button>
+            <button className="btn-ghost" onClick={() => setStep(cameFrom)}>
+              {cameFrom === 'projects' ? '← Projects' : '← Edit plan'}
+            </button>
             <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {planTitle || 'Untitled plan'}
             </h1>
