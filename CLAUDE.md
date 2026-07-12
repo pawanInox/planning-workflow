@@ -21,15 +21,15 @@ Use this to read or edit a user's plan while they review it in the app — the r
 | Method & path | Body | `data` |
 |---|---|---|
 | `GET /api/v1/projects` | — | `[{ id, title, taskCount, doneCount, updatedAt }]` |
-| `POST /api/v1/projects` | `{ title, tasks: [Task] }` | 201, project + tasks (with ids, ordered) |
-| `GET /api/v1/projects/:id` | — | project + `tasks` sorted by `order`, each with its own `id` |
-| `PUT /api/v1/projects/:id` | `{ title?, tasks? }` | tasks value replaces ALL tasks (new ids) |
+| `POST /api/v1/projects` | `{ title, tasks: [Task], diagram? }` | 201, project + tasks (with ids, ordered) |
+| `GET /api/v1/projects/:id` | — | project (incl. `diagram` if set) + `tasks` sorted by `order`, each with its own `id` |
+| `PUT /api/v1/projects/:id` | `{ title?, tasks?, diagram? }` | tasks value replaces ALL tasks (new ids) |
 | `DELETE /api/v1/projects/:id` | — | 200, cascades tasks |
 | `POST /api/v1/projects/:id/tasks` | `Task` | 201, appended task |
 | `PATCH /api/v1/projects/:id/tasks/:taskId` | any subset of Task fields | updated task |
 | `DELETE /api/v1/projects/:id/tasks/:taskId` | — | 200 |
 
-`Task` = `{ title, problem, todo, outcome, dependsOn?: [{ title, reason }], done?: boolean }` — the four text fields are required non-empty (Zod-validated, 400 with per-field `details` otherwise). Unknown project/task id (or a task id from another project) → 404. `MONGODB_URI` unset → 503 on every `/api/v1/projects` route. Also under `/api/v1`: `GET /teams`, `POST /issues` (Linear), `GET /memes?q=`.
+`Task` = `{ title, problem, todo, outcome, dependsOn?: [{ title, reason }], done?: boolean, diagramNodes?: [string] }` — the four text fields are required non-empty (Zod-validated, 400 with per-field `details` otherwise). Unknown project/task id (or a task id from another project) → 404. `MONGODB_URI` unset → 503 on every `/api/v1/projects` route. Also under `/api/v1`: `GET /teams`, `POST /issues` (Linear), `GET /memes?q=`.
 
 **Prefer `PATCH` on a single task for edits** — it's partial and won't disturb `done` flags the app is live-syncing. Example: reword a task's what-to-do:
 
@@ -40,3 +40,5 @@ curl -X PATCH localhost:3001/api/v1/projects/$PID/tasks/$TID \
 ```
 
 Avoid `PUT` with `tasks` while a user is mid-review unless asked — it recreates every task with new ids.
+
+`diagram` is the project's mermaid architecture flowchart (source text), generated at planning time (see `docs/adr/0001`); `diagramNodes` on a task lists the diagram node ids that task touches — the review screen highlights them. The app never generates diagrams; a `PUT { diagram }` (without `tasks`) or `PATCH { diagramNodes }` is the way to fix one up.

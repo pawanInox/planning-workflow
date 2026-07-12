@@ -10,16 +10,21 @@ export type TaskEntity = {
   outcome: string
   dependsOn: Dep[]
   done: boolean
+  /** Mermaid node ids this task touches in the project diagram. */
+  diagramNodes: string[]
 }
 
-export type NewTask = Omit<TaskEntity, 'id' | 'projectId' | 'order' | 'dependsOn' | 'done'> & {
+export type NewTask = Omit<TaskEntity, 'id' | 'projectId' | 'order' | 'dependsOn' | 'done' | 'diagramNodes'> & {
   dependsOn?: Dep[]
   done?: boolean
+  diagramNodes?: string[]
 }
 
 export type Project = {
   id: string
   title: string
+  /** Mermaid source of the project's architecture flowchart, generated at planning time. */
+  diagram?: string
   createdAt: Date
   updatedAt: Date
 }

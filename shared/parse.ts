@@ -83,7 +83,10 @@ export function planToMarkdown(
 }
 
 export const AGENT_RULES =
-  'Use the ponytail skill for this task. If it is not installed, install it first: `claude plugin marketplace add DietrichGebert/ponytail && claude plugin install ponytail@ponytail`, then invoke /ponytail. If installation is not possible in your environment, work in its spirit instead: the simplest solution that works, stdlib and already-installed dependencies first, fewest files, no speculative abstractions, shortest working diff. Before finishing: verify the Expected outcome actually holds by running the check it describes (the Before/After lines are your acceptance test), and leave one minimal runnable check behind if the logic is non-trivial.'
+  'Read and follow the implement skill: read `.agents/skills/implement/SKILL.md` in this repo if it exists (by path — that directory is not auto-discovered), otherwise fetch https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/implement/SKILL.md. Resolve any sub-skills it mentions the same way (repo `.agents/skills/<name>/SKILL.md` first, then the same GitHub repo). If neither source is reachable, work in its spirit: implement the work end to end, run typechecking and the relevant single test files regularly and the full suite once at the end, review the work, then commit to the current branch. Either way, verify the Expected outcome actually holds by running the check it describes (the Before/After lines are your acceptance test).'
+
+export const REVIEW_RULES =
+  'Read and follow the code-review skill: read `.agents/skills/code-review/SKILL.md` in this repo if it exists (by path — that directory is not auto-discovered), otherwise fetch https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/code-review/SKILL.md. The task below is the spec for the Spec axis. Fixed point: the commit before this task\'s implementation began; if that is unclear and there are uncommitted changes, review `git diff HEAD`, otherwise ask. If neither source is reachable, review along the same two axes yourself: this repo\'s standards/conventions, and faithfulness to the task below.'
 
 const depLines = (t: Task) =>
   t.dependsOn.map(d => `- ${d.title}${d.reason ? ` — ${d.reason}` : ''}`).join('\n')
@@ -101,4 +104,11 @@ export function taskToPrompt(t: Task): string {
     ? `\n\nPrerequisites (already done — context only, do not redo them):\n${depLines(t)}`
     : ''
   return `${AGENT_RULES}\n\nDo this task end to end:\n\n# ${t.title}\n\n${sections(t)}${deps}`
+}
+
+export function taskToReviewPrompt(t: Task): string {
+  const deps = t.dependsOn.length
+    ? `\n\nPrerequisite tasks (separate work — their changes are in scope only where this task builds on them):\n${depLines(t)}`
+    : ''
+  return `${REVIEW_RULES}\n\nReview the implementation of this task:\n\n# ${t.title}\n\n${sections(t)}${deps}`
 }

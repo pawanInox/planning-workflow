@@ -1,10 +1,11 @@
-import type { Dispatch, SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import type { Task } from '../../shared/parse'
 import { TaskCard } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { DiagramPanel } from '../components/DiagramPanel'
 
-export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip }: {
+export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, taskNodes }: {
   planTitle: string
   tasks: Task[]
   done: Set<number>
@@ -15,7 +16,13 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   backLabel: string
   onBack: () => void
   onShip: () => void
+  diagram: string
+  taskNodes: string[][]
 }) {
+  const [showDiagram, setShowDiagram] = useState(false)
+  const [focusTop, setFocusTop] = useState<number | null>(null)
+  const [selected, setSelected] = useState<number | null>(null)
+  const active = view === 'focus' ? focusTop : selected
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <header style={{
@@ -32,6 +39,11 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {saveError && <span style={{ fontSize: 12, color: 'var(--warn)' }} title={saveError}>⚠ not saved</span>}
           <ThemeToggle />
+          {diagram && (
+            <button className={`btn-ghost${showDiagram ? ' active' : ''}`} onClick={() => setShowDiagram(s => !s)}>
+              🗺 Diagram
+            </button>
+          )}
           <button className={`btn-ghost${view === 'focus' ? ' active' : ''}`} onClick={() => setView('focus')}>Focus</button>
           <button className={`btn-ghost${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>List</button>
           <button className="btn-primary" disabled={done.size === 0} onClick={onShip}>
@@ -40,8 +52,12 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         </div>
       </header>
 
+      {diagram && showDiagram && (
+        <DiagramPanel source={diagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
+      )}
+
       {view === 'focus' ? (
-        <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} />
+        <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
       ) : (<>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
           <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -66,6 +82,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
               next.has(i) ? next.delete(i) : next.add(i)
               return next
             })}
+            onSelect={diagram ? () => { setSelected(i); setShowDiagram(true) } : undefined}
           />
         ))}
       </>)}

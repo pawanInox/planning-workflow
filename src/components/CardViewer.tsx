@@ -35,11 +35,12 @@ function Meme({ query, fallback }: { query: string; fallback?: ReactNode }) {
   )
 }
 
-export function CardViewer({ tasks, done, setDone, onShip }: {
+export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   tasks: Task[]
   done: Set<number>
   setDone: (d: Set<number>) => void
   onShip: () => void
+  onTopChange?: (index: number | null) => void
 }) {
   const [queue, setQueue] = useState<number[]>([])
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
@@ -62,6 +63,8 @@ export function CardViewer({ tasks, done, setDone, onShip }: {
   }, [tasks])
 
   const top = queue[0]
+
+  useEffect(() => { onTopChange?.(top ?? null) }, [top])
 
   function commit(dir: Dir) {
     if (top === undefined || leaving) return

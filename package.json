@@ -10,6 +10,7 @@
   "dependencies": {
     "@linear/sdk": "^39.0.0",
     "express": "^4.21.0",
+    "mermaid": "^11.16.0",
     "mongoose": "^9.7.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

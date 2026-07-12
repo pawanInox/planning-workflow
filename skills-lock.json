@@ -7,11 +7,41 @@
       "skillPath": "SKILL.md",
       "computedHash": "477f93d8e81a26b62218ca283904711184cd6886ae0ea7b745a6c08e98c9729b"
     },
+    "grill-with-docs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "computedHash": "e7ef25bbee50cda2eb7b3a8ef541db0a0396dad7d369f7d14fb610671dd1864b"
+    },
+    "implement": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/implement/SKILL.md",
+      "computedHash": "0d51255cab5cf937b8fe41252f00213706e0175ca9607fc00409d29562b5b839"
+    },
+    "to-spec": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "computedHash": "c5d294a88d00942a38dc589299423e35ea07157cf29eed21434378edb5cfafa4"
+    },
+    "to-tickets": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "683ed84afd324a6b0163157489ecf1c996a3af3cffedc1d877a89948d4adfc7c"
+    },
     "vite-react-best-practices": {
       "source": "claudiocebpaz/vite-react-best-practices",
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "91b1ffc84b35ea55b852ab97f85df226948e9d157e7cda0893fa493a91222ea4"
+    },
+    "wayfinder": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/wayfinder/SKILL.md",
+      "computedHash": "3eb72cd9abdfaa00e10fa69f0b4410ff8639a6cf4eb9e5d187b289c3aa9be2fc"
     }
   }
 }

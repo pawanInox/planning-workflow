@@ -1,26 +1,29 @@
 ---
 name: linear-plan
-description: Turn a goal — or a whole conversation — into a PRD plus an implementation plan in the strict format the plan-to-linear app can split into Linear tasks. Use when the user asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grill-me session into tasks.
+description: Turn a goal — or a whole conversation — into a spec plus an implementation plan in the strict format the plan-to-linear app can split into Linear tasks. Runs the grill-with-docs → to-spec → to-tickets pipeline, generates a mermaid architecture diagram from the spec, then renders the tickets into the app's plan format and auto-creates the project (diagram included, tasks tagged with the diagram nodes they touch). Use when the user asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grilling session into tasks.
 ---
 
-# Linear plan (PRD-core)
+# Linear plan (grill → spec → tickets → plan)
 
-The user may give you anything from a one-line goal to a whole conversation's worth of context. Your job: synthesize a PRD, then decompose it into tasks in the strict format below.
+The user may give you anything from a one-line goal to a whole conversation's worth of context. Your job: sharpen it with an interview, synthesize a spec, break it into tickets, and render those tickets into the strict plan format below.
 
-Core method adapted from [mattpocock's to-prd skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/to-prd/SKILL.md).
+This skill chains four skills that live in `.agents/skills/` (Claude Code does not auto-discover that directory — read each `SKILL.md` by path when the step begins and follow it):
 
 ## Workflow
 
-1. **Synthesize, don't interview.** Explore the repo if you haven't already, then draft a compact PRD from what the conversation and codebase already contain. Do NOT ask about things already discussed or discoverable in code. PRD sections:
-   - **Problem statement** — the problem from the user's perspective.
-   - **Solution** — the solution from the user's perspective.
-   - **User stories** — a numbered, extensive list: "As an <actor>, I want <feature>, so that <benefit>".
-   - **Implementation decisions** — modules to build/modify, interfaces, architecture, schema/API contracts. Prose over file paths and code dumps; inline a snippet only when it encodes a decision more precisely than prose (type shape, schema, state machine) — trim to the decision-rich part.
-   - **Testing decisions** — what makes a good test here (external behavior, not implementation details), which modules get tested, prior art in the codebase.
-   - **Out of scope** — what this plan deliberately does not cover.
-2. **Ask only to fill gaps.** If a genuine gap remains that changes the tasks and isn't answerable from context, ask 1–3 questions with AskUserQuestion. For big, fuzzy, or high-stakes goals — or when the user says "grill me" — invoke the `grill-me` skill instead; its resolved branches feed the PRD's decisions. If the conversation is already rich, ask nothing.
-3. **Decompose the PRD into tasks** in the exact format below. Every task must trace to at least one user story. Implementation decisions land in "What to do"; Testing decisions shape "Expected outcome"; nothing from Out of scope becomes a task. A decision that never lands in a task is lost.
-4. **Output both**: the PRD as prose first, then the `# Plan:` block ready to paste into the app.
+1. **Interview with grill-with-docs.** Read and follow `.agents/skills/grill-with-docs/SKILL.md` — a relentless interview that sharpens the plan and produces docs (ADRs, glossary) as it goes. It delegates to two more skills that also live in `.agents/skills/` and must be read by path, not slash-invoked: `.agents/skills/grilling/SKILL.md` (the interview itself — one question at a time, with a recommended answer each) and `.agents/skills/domain-modeling/SKILL.md` (glossary + ADRs, formats in `ADR-FORMAT.md`/`CONTEXT-FORMAT.md` beside it). Run it for big, fuzzy, or high-stakes goals, or whenever the user asks to be grilled. Skip the interview only when the conversation already contains the answers (e.g. converting a finished discussion) — never re-ask what's already settled, and never ask what's discoverable in the code.
+2. **Summarize into a spec with to-spec.** Read and follow `.agents/skills/to-spec/SKILL.md` to synthesize the grilled conversation + codebase understanding into a spec — problem statement, solution, extensive user stories, implementation decisions, testing decisions, out of scope. No second interview. Use the glossary vocabulary and respect the ADRs from step 1. Output the spec as prose in the chat; do NOT publish it to any issue tracker — the plan-to-linear app is the tracker in this pipeline.
+3. **Break into tickets with to-tickets.** Read and follow `.agents/skills/to-tickets/SKILL.md`: draft tracer-bullet vertical slices with blocking edges (expand–contract for wide refactors), then quiz the user on granularity and edges and iterate until they approve the breakdown. Do NOT publish to `.scratch/` or a tracker — the approved tickets feed the next step instead.
+4. **Generate the project diagram.** Read `.agents/skills/mermaid-skill/SKILL.md` and follow it to write a mermaid flowchart (`graph TD`) of the system from the spec's implementation decisions — components and data flow, not the task list. Use short, stable, camelCase node ids (e.g. `web`, `apiServer`, `db`); the app highlights nodes by these ids, so never rename them between steps. Validate the syntax before use (mermaid-skill's validation-first rule — Kroki or local `mmdc`; no PNG export needed). Then tag every approved ticket with the node ids it touches (an empty list is fine). The review screen renders this diagram and glows the active task's nodes.
+5. **Render the approved tickets into the plan format below**, one `## Task:` block per ticket, ordered blockers-first (execution order):
+   - Ticket title → `## Task:` title (imperative, unique). Blocking edges → `### Depends on` lines, each with a concrete blocking reason.
+   - **Carry over everything the ticket and spec know — nothing from a ticket's description may be dropped.** The ticket's "what to build" and the spec's problem context become `### Problem` (ending with a concrete `Scenario:` line). The spec's implementation decisions for this slice become `### What to do` as detailed concrete steps — and unlike tracker tickets, real file paths, commands, and APIs are REQUIRED here, not avoided: each card doubles as a self-contained agent prompt, so staleness loses to completeness. The ticket's acceptance criteria and demoable behaviour become `### Expected outcome`, ending with `Before:`/`After:` lines replaying the scenario.
+   - Every task must satisfy the Rules section below; a spec decision or ticket detail that lands in no task is lost.
+6. **Auto-create the project and return its review link.** After outputting the plan, create it in the plan-to-linear app so the user can start reviewing without pasting:
+   - API base: `http://localhost:3001` (`npm run dev`); if unreachable, fall back to `http://localhost:5173` (docker compose publishes only the web proxy).
+   - `POST <base>/api/v1/projects` with JSON `{ "title": <text after "# Plan:">, "diagram": <the mermaid source from step 4>, "tasks": [{ "title", "problem", "todo", "outcome", "dependsOn": [{ "title", "reason" }], "diagramNodes": [<node ids from step 4>] }] }` — one entry per `## Task:` block, section texts verbatim (keep `Scenario:`/`Before:`/`After:` lines inside their sections). Skip any task missing a required section. If working inside the plan-to-linear repo, prefer parsing with its own `parsePlan` from `shared/parse.ts` (via `npx tsx`) over hand-building the JSON — then merge `diagram`/`diagramNodes` into the parsed payload (the markdown format doesn't carry them).
+   - Responses use an envelope `{ status, message, data }`. On 201, give the user the review link: `http://localhost:5173/?project=<id from response data.id>` — it opens the project directly in review.
+   - If the API is down or returns 503 (Mongo not configured), skip without retrying and tell the user to paste the `# Plan:` block into the app manually.
 
 ## Format
 
@@ -49,7 +52,7 @@ Repeat the `## Task:` block for every task. Prose outside task blocks is ignored
 ## Rules
 
 - Every task must be **self-contained**: a teammate (or their AI agent) picks up one task with no other context and can finish it. Repeat context in each task rather than referencing "the task above".
-- Every task doubles as an **agent prompt**: the app generates a per-task "🤖 Copy prompt" (which forces the ponytail skill — simplest working solution) verbatim from Problem + What to do + Expected outcome. Do NOT embed prompt text in the plan; instead write those three sections concretely enough that an AI agent given only them (plus dependency titles) can complete and verify the task.
+- Every task doubles as an **agent prompt**: the app generates a per-task "🤖 Copy prompt" (which directs the agent to the `implement` skill in `.agents/skills/`) and a "🔍 Copy review" (the `code-review` skill, with the task as the spec) verbatim from Problem + What to do + Expected outcome. Do NOT embed prompt text in the plan; instead write those three sections concretely enough that an AI agent given only them (plus dependency titles) can complete and verify the task.
 - **Problem** states why, not what, and always ends with a `Scenario:` line — one concrete, specific example (real user role, real action, real wrong result). "Scenario: a Team-A editor opens /articles?teamId=team-b and sees Team B's drafts" — never "users see wrong data".
 - **What to do** names real files, commands, and APIs — not "implement the feature". Be generous with detail: exact functions to call, exact places to change, edge cases to handle.
 - **Expected outcome** must be checkable, and always ends with `Before:` and `After:` lines replaying the Problem's scenario — the same action, showing today's result vs the result once done. Not "it works better".

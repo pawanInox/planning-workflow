@@ -11,6 +11,7 @@ const taskSchema = new Schema(
     outcome: { type: String, required: true },
     dependsOn: { type: [new Schema({ title: String, reason: String }, { _id: false })], default: [] },
     done: { type: Boolean, default: false },
+    diagramNodes: { type: [String], default: [] },
   },
   { timestamps: true },
 )
@@ -22,4 +23,5 @@ export const toTask = (d: any): TaskEntity => ({
   title: d.title, problem: d.problem, todo: d.todo, outcome: d.outcome,
   dependsOn: (d.dependsOn ?? []).map((x: any) => ({ title: x.title ?? '', reason: x.reason ?? '' })),
   done: d.done,
+  diagramNodes: d.diagramNodes ?? [],
 })

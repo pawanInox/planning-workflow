@@ -1,23 +1,31 @@
 import { useState } from 'react'
-import { taskToPrompt } from '../../shared/parse'
+import { taskToPrompt, taskToReviewPrompt } from '../../shared/parse'
 import type { Task } from '../../shared/parse'
 
-export function CopyPromptButton({ task }: { task: Task }) {
+function CopyButton({ label, title, text }: { label: string; title: string; text: () => string }) {
   const [copied, setCopied] = useState(false)
   return (
     <button
       className="btn-ghost"
       style={{ height: 28, fontSize: 12, padding: '0 10px', whiteSpace: 'nowrap' }}
-      title="Copy a ready-to-paste prompt for an AI agent to do this task"
+      title={title}
       onClick={() => {
-        navigator.clipboard.writeText(taskToPrompt(task))
+        navigator.clipboard.writeText(text())
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       }}
     >
-      {copied ? '✓ Copied' : '🤖 Copy prompt'}
+      {copied ? '✓ Copied' : label}
     </button>
   )
+}
+
+// renders both agent-prompt buttons: implement (the implement skill) and review (the code-review skill)
+export function CopyPromptButton({ task }: { task: Task }) {
+  return (<>
+    <CopyButton label="🤖 Copy prompt" title="Copy a ready-to-paste prompt for an AI agent to do this task" text={() => taskToPrompt(task)} />
+    <CopyButton label="🔍 Copy review" title="Copy a prompt for an AI agent to code-review this task's implementation" text={() => taskToReviewPrompt(task)} />
+  </>)
 }
 
 export const cardHue = (index: number) => `var(--card-hue-${index % 6})`
@@ -153,12 +161,13 @@ export function Section({ name, text, tone, large = false }: { name: string; tex
   )
 }
 
-export function TaskCard({ task, index, checked, onToggle, resolveDep }: {
+export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect }: {
   task: Task
   index: number
   checked?: boolean
   onToggle?: () => void
   resolveDep?: (title: string) => { done: boolean } | null
+  onSelect?: () => void
 }) {
   const hue = cardHue(index)
   return (
@@ -171,7 +180,11 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep }: {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span
+          style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, cursor: onSelect ? 'pointer' : undefined }}
+          onClick={onSelect}
+          title={onSelect ? 'Show this task in the diagram' : undefined}
+        >
           <span className="icon-chip" style={{ background: `color-mix(in srgb, ${hue} 14%, transparent)` }}>{taskIcon(task)}</span>
           <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>{task.title}</span>
         </span>

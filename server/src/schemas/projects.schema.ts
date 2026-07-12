@@ -12,12 +12,14 @@ export const taskSchema = z.object({
   outcome: z.string().trim().min(1, 'outcome may not be empty'),
   dependsOn: z.array(dep).default([]),
   done: z.boolean().default(false),
+  diagramNodes: z.array(z.string().trim().min(1)).default([]),
 })
 
 export const createProjectSchema = {
   body: z.object({
     title: z.string().trim().min(1, 'project title must be a non-empty string'),
     tasks: z.array(taskSchema).default([]),
+    diagram: z.string().trim().min(1, 'diagram may not be an empty string').optional(),
   }),
 }
 
@@ -25,6 +27,7 @@ export const updateProjectSchema = {
   body: z.object({
     title: z.string().trim().min(1, 'project title must be a non-empty string').optional(),
     tasks: z.array(taskSchema).optional(),
+    diagram: z.string().trim().min(1, 'diagram may not be an empty string').optional(),
   }),
 }
 
@@ -40,5 +43,6 @@ export const patchTaskSchema = {
     outcome: z.string().trim().min(1, 'outcome may not be empty').optional(),
     dependsOn: z.array(dep).optional(),
     done: z.boolean().optional(),
+    diagramNodes: z.array(z.string().trim().min(1)).optional(),
   }),
 }

@@ -3,9 +3,9 @@ import type { Dep } from '../../shared/parse'
 export type ProjectSummary = { id: string; title: string; taskCount: number; doneCount: number; updatedAt: string }
 export type SavedTask = {
   id: string; title: string; problem: string; todo: string; outcome: string
-  dependsOn: Dep[]; done: boolean
+  dependsOn: Dep[]; done: boolean; diagramNodes?: string[]
 }
-export type ProjectWithTasks = { id: string; title: string; tasks: SavedTask[] }
+export type ProjectWithTasks = { id: string; title: string; diagram?: string; tasks: SavedTask[] }
 export type TaskPayload = Omit<SavedTask, 'id'>
 export type Team = { id: string; name: string; key: string }
 export type CreatedIssue = { title: string; url: string }
@@ -34,11 +34,11 @@ export const api = {
   getProject: (id: string): Promise<ProjectWithTasks> =>
     fetch(`${BASE}/projects/${id}`).then(r => unwrap<ProjectWithTasks>(r)),
 
-  createProject: (title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
-    fetch(`${BASE}/projects`, send('POST', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
+  createProject: (title: string, tasks: TaskPayload[], diagram?: string): Promise<ProjectWithTasks> =>
+    fetch(`${BASE}/projects`, send('POST', { title, tasks, ...(diagram ? { diagram } : {}) })).then(r => unwrap<ProjectWithTasks>(r)),
 
-  updateProject: (id: string, title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
-    fetch(`${BASE}/projects/${id}`, send('PUT', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
+  updateProject: (id: string, title: string, tasks: TaskPayload[], diagram?: string): Promise<ProjectWithTasks> =>
+    fetch(`${BASE}/projects/${id}`, send('PUT', { title, tasks, ...(diagram ? { diagram } : {}) })).then(r => unwrap<ProjectWithTasks>(r)),
 
   deleteProject: (id: string): Promise<void> =>
     fetch(`${BASE}/projects/${id}`, { method: 'DELETE' }).then(r => unwrap<void>(r)),

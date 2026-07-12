@@ -21,6 +21,8 @@ export function App() {
   const [error, setError] = useState('')
   const [projectId, setProjectId] = useState<string | null>(null)
   const [taskIds, setTaskIds] = useState<(string | undefined)[]>([])
+  const [diagram, setDiagram] = useState('')
+  const [taskNodes, setTaskNodes] = useState<string[][]>([]) // diagram node ids per task, index-aligned with tasks
   const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([])
   const [saveError, setSaveError] = useState('')
   const [listError, setListError] = useState('')
@@ -76,6 +78,8 @@ export function App() {
         setDone(doneSet)
         syncedDone.current = doneSet
         setTaskIds(p.tasks.map(t => t.id))
+        setDiagram(p.diagram ?? '')
+        setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
       } catch { /* api unreachable — keep reviewing locally */ }
     }, 3000)
     return () => clearInterval(poll)
@@ -107,6 +111,7 @@ export function App() {
         .map((t, i) => t.errors.length ? null : ({
           title: t.title, problem: t.problem, todo: t.todo, outcome: t.outcome,
           dependsOn: t.dependsOn, done: done.has(i),
+          diagramNodes: taskNodes[i] ?? [], // carry nodes through PUT's replace-all-tasks
         }))
         .filter(t => t !== null)
       const p = projectId
@@ -114,6 +119,7 @@ export function App() {
         : await api.createProject(title, payload)
       let j = 0
       setTaskIds(tasks.map(t => (t.errors.length ? undefined : p.tasks[j++]?.id)))
+      setDiagram(p.diagram ?? '')
       syncedDone.current = new Set(done)
       serverMd.current = planToMarkdown(title, p.tasks)
       setProjectId(p.id)
@@ -133,6 +139,8 @@ export function App() {
       setDone(doneSet)
       setCreated([])
       setTaskIds(p.tasks.map(t => t.id))
+      setDiagram(p.diagram ?? '')
+      setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
       syncedDone.current = doneSet
       serverMd.current = fresh
       setProjectId(p.id)
@@ -158,6 +166,7 @@ export function App() {
   function newPlan() {
     setMd(''); setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([])
+    setDiagram(''); setTaskNodes([])
     syncedDone.current = new Set(); serverMd.current = ''
     setSaveError('')
     setStep('input')
@@ -167,6 +176,7 @@ export function App() {
     setMd(value)
     setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([]); syncedDone.current = new Set()
+    setDiagram(''); setTaskNodes([]) // edited markdown is a new plan — old diagram no longer matches task indexes
   }
 
   function startReview() {
@@ -219,6 +229,8 @@ export function App() {
           backLabel={cameFrom === 'projects' ? '← Projects' : '← Edit plan'}
           onBack={() => setStep(cameFrom)}
           onShip={() => setStep('create')}
+          diagram={diagram}
+          taskNodes={taskNodes}
         />
       ) : (
         <ShipPage
