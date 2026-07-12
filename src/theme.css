@@ -289,3 +289,28 @@ h1, h2, .serif { font-family: var(--serif); }
   .pop, .bounce { animation: none; }
   .progress-fill { transition: none; }
 }
+
+.review-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 520px) minmax(0, 760px);
+  gap: 24px;
+  justify-content: center;
+}
+.review-split > .diagram-col {
+  position: sticky;
+  top: 66px; /* clears the sticky review header (~65px tall) */
+  max-height: calc(100vh - 78px);
+  overflow: auto;
+}
+/* fill the column so the diagram card matches the task column's height */
+.diagram-col > .card {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.diagram-col svg { max-width: 100%; height: auto; }
+@media (max-width: 1023px) {
+  .review-split { grid-template-columns: minmax(0, 1fr); }
+  .review-split > .diagram-col { position: static; max-height: none; }
+}

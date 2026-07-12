@@ -22,8 +22,38 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const active = view === 'focus' ? focusTop : selected
+  const body = view === 'focus' ? (
+    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
+  ) : (<>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
+      <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+        ⚡ {done.size} / {tasks.length} done
+      </span>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${(done.size / tasks.length) * 100}%` }} />
+      </div>
+    </div>
+    {tasks.map((t, i) => (
+      <TaskCard
+        key={i}
+        task={t}
+        index={i}
+        checked={done.has(i)}
+        resolveDep={dep => {
+          const di = tasks.findIndex(x => x.title.toLowerCase() === dep.toLowerCase())
+          return di === -1 ? null : { done: done.has(di) }
+        }}
+        onToggle={() => setDone(prev => {
+          const next = new Set(prev)
+          next.has(i) ? next.delete(i) : next.add(i)
+          return next
+        })}
+        onSelect={diagram ? () => setSelected(i) : undefined}
+      />
+    ))}
+  </>)
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ maxWidth: diagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -46,40 +76,16 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         </div>
       </header>
 
-      {diagram && (
-        <DiagramPanel source={diagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
-      )}
-
-      {view === 'focus' ? (
-        <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
-      ) : (<>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            ⚡ {done.size} / {tasks.length} done
-          </span>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${(done.size / tasks.length) * 100}%` }} />
+      {diagram ? (
+        <div className="review-split">
+          <div className="diagram-col">
+            <DiagramPanel source={diagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+            {body}
           </div>
         </div>
-        {tasks.map((t, i) => (
-          <TaskCard
-            key={i}
-            task={t}
-            index={i}
-            checked={done.has(i)}
-            resolveDep={dep => {
-              const di = tasks.findIndex(x => x.title.toLowerCase() === dep.toLowerCase())
-              return di === -1 ? null : { done: done.has(di) }
-            }}
-            onToggle={() => setDone(prev => {
-              const next = new Set(prev)
-              next.has(i) ? next.delete(i) : next.add(i)
-              return next
-            })}
-            onSelect={diagram ? () => setSelected(i) : undefined}
-          />
-        ))}
-      </>)}
+      ) : body}
     </div>
   )
 }
