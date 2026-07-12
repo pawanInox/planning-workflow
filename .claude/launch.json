@@ -11,6 +11,16 @@
       "port": 5173
     },
     {
+      "name": "dev-5199",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "concurrently",
+        "vite --port 5199 --strictPort",
+        "PORT=3001 MONGODB_URI=mongodb://localhost:27019/plan-to-linear tsx watch server/index.ts"
+      ],
+      "port": 5199
+    },
+    {
       "name": "web-preview",
       "runtimeExecutable": "env",
       "runtimeArgs": [

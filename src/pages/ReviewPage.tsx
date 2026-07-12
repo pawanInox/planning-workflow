@@ -19,7 +19,6 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   diagram: string
   taskNodes: string[][]
 }) {
-  const [showDiagram, setShowDiagram] = useState(false)
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const active = view === 'focus' ? focusTop : selected
@@ -39,11 +38,6 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {saveError && <span style={{ fontSize: 12, color: 'var(--warn)' }} title={saveError}>⚠ not saved</span>}
           <ThemeToggle />
-          {diagram && (
-            <button className={`btn-ghost${showDiagram ? ' active' : ''}`} onClick={() => setShowDiagram(s => !s)}>
-              🗺 Diagram
-            </button>
-          )}
           <button className={`btn-ghost${view === 'focus' ? ' active' : ''}`} onClick={() => setView('focus')}>Focus</button>
           <button className={`btn-ghost${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>List</button>
           <button className="btn-primary" disabled={done.size === 0} onClick={onShip}>
@@ -52,7 +46,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         </div>
       </header>
 
-      {diagram && showDiagram && (
+      {diagram && (
         <DiagramPanel source={diagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
       )}
 
@@ -82,7 +76,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
               next.has(i) ? next.delete(i) : next.add(i)
               return next
             })}
-            onSelect={diagram ? () => { setSelected(i); setShowDiagram(true) } : undefined}
+            onSelect={diagram ? () => setSelected(i) : undefined}
           />
         ))}
       </>)}
