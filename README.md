@@ -81,7 +81,7 @@ Full endpoint reference lives in [CLAUDE.md](CLAUDE.md) (which doubles as the AP
 ## Working with Claude
 
 - [CLAUDE.md](CLAUDE.md) auto-loads in any Claude Code session in this repo — Claude can list, edit, and mark tasks done via the API with no extra setup; the review screen polls every 3 s and reflects external edits live.
-- The `/linear-plan` skill ([.claude/skills/linear-plan](.claude/skills/linear-plan)) turns a goal or a whole conversation into a PRD + plan in the app's format, then **auto-creates the project and hands back the review URL**.
+- The `/yak-dai` skill ([.claude/skills/yak-dai](.claude/skills/yak-dai)) turns a goal or a whole conversation into a PRD + plan in the app's format, then **auto-creates the project and hands back the review URL**.
 - Code conventions are enforced by two vendored skills: [vite-react-best-practices](.claude/skills/vite-react-best-practices) (frontend) and [express-typescript-api-best-practices](.claude/skills/express-typescript-api-best-practices) (server); repo-specific deviations are recorded in CLAUDE.md.
 
 ## Architecture

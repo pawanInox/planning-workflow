@@ -1,9 +1,9 @@
 ---
-name: linear-plan
-description: Turn a goal — or a whole conversation — into a spec plus an implementation plan in the strict format the plan-to-linear app can split into Linear tasks. Runs the grilling → to-spec → to-tickets pipeline (no docs written), generates a mermaid architecture diagram from the spec, then renders the tickets into the app's plan format and auto-creates the project (diagram included, tasks tagged with the diagram nodes they touch). Use when the user asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grilling session into tasks.
+name: yak-dai
+description: Turn a goal — or a whole conversation — into a spec plus an implementation plan in the strict format the plan-to-linear app can split into Linear tasks. Runs the grilling → to-spec → to-tickets pipeline (no docs written), generates a mermaid architecture diagram from the spec, then renders the tickets into the app's plan format and auto-creates the project (diagram included, tasks tagged with the diagram nodes they touch). Use when the user invokes /yak-dai, asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grilling session into tasks.
 ---
 
-# Linear plan (grill → spec → tickets → plan)
+# Yak-dai (grill → spec → tickets → plan)
 
 The user may give you anything from a one-line goal to a whole conversation's worth of context. Your job: sharpen it with an interview, synthesize a spec, break it into tickets, and render those tickets into the strict plan format below.
 
