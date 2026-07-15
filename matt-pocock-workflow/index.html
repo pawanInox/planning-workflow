@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matt Pocock's AI Workflow — 5-Step Knowledge Share</title>
+
+<!-- Scatterbrain type stack: Shrikhand (display) + Zilla Slab (body) + Caveat (hand-script) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Zilla+Slab:wght@300;400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap">
+
+<style>
+/* ===========================================
+   SCATTERBRAIN — Post-it & cork-board system
+   Pastel sticky notes, pins, tape, doodles.
+   Change tokens here to shift the whole look.
+   =========================================== */
+:root {
+    --yellow: #ffe066; --yellow-deep: #ffd43b;
+    --blue: #a5d8ff;   --blue-deep: #74c0fc;
+    --pink: #ffc9c9;   --pink-deep: #ff9f9f;
+    --green: #b2f2bb;  --green-deep: #8ce99a;
+    --orange: #ffcc80;
+    --purple: #d0bfff;
+
+    --cream: #faf8f3;
+    --paper: #f7f5f0;
+    --ink: #2d2a26;
+    --ink-light: #5c5750;
+    --marker: #c92a2a;                 /* red marker for slash-commands */
+    --shadow: rgba(45, 42, 38, 0.15);
+    --shadow-deep: rgba(45, 42, 38, 0.25);
+
+    --stage-bg: #e7dcc6;               /* warm letterbox */
+    --slide-bg: #f7f5f0;               /* base paper */
+
+    --font-display: 'Shrikhand', cursive;
+    --font-body: 'Zilla Slab', serif;
+    --font-script: 'Caveat', cursive;
+
+    --slide-padding: 96px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.7s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* --- viewport-base.css (verbatim, mandatory fixed-stage) --- */
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+    display: block; visibility: hidden; opacity: 0; pointer-events: none; background: var(--slide-bg, #fff);
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.deck-controls { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1000; }
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide { position: relative; display: block !important; visibility: visible !important; opacity: 1 !important;
+        pointer-events: auto !important; width: 1920px; height: 1080px; break-after: page; page-break-after: always; }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* ===========================================
+   BACKGROUND TEXTURE VARIANTS (one per slide)
+   =========================================== */
+.slide {
+    color: var(--ink); font-family: var(--font-body);
+    padding: var(--slide-padding);
+    /* thumbtack cursor — the deck's persistent metaphor */
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><circle cx='13' cy='13' r='9' fill='%23c92a2a'/><circle cx='13' cy='13' r='3.5' fill='white'/></svg>") 13 13, auto;
+}
+/* desk paper: cream + faint 40px grid */
+.bg-paper {
+    background-color: var(--cream);
+    background-image:
+        linear-gradient(rgba(45,42,38,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,42,38,0.05) 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px;
+}
+/* cork board: warm tan tonal wash + speckle */
+.bg-cork {
+    background-color: #cdae82;
+    background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(255,240,210,0.5), transparent 60%),
+        radial-gradient(circle at 20% 30%, rgba(120,90,55,0.18) 1.5px, transparent 2px),
+        radial-gradient(circle at 65% 55%, rgba(120,90,55,0.16) 1.5px, transparent 2px),
+        radial-gradient(circle at 85% 80%, rgba(120,90,55,0.18) 1.5px, transparent 2px),
+        linear-gradient(160deg, #d3b587, #c19f6f);
+    background-size: 100% 100%, 90px 90px, 130px 130px, 70px 70px, 100% 100%;
+}
+/* warm gradient: cream + soft glows of yellow/blue/pink */
+.bg-warm {
+    background-color: var(--cream);
+    background-image:
+        radial-gradient(900px 600px at 12% 8%, rgba(255,224,102,0.45), transparent 60%),
+        radial-gradient(900px 700px at 92% 20%, rgba(165,216,255,0.40), transparent 60%),
+        radial-gradient(1000px 800px at 70% 100%, rgba(255,201,201,0.40), transparent 60%),
+        linear-gradient(180deg, var(--cream), #f3efe6);
+}
+
+/* fixed grain over everything (4%) */
+.grain {
+    position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ===========================================
+   TYPOGRAPHY (authored at 1920×1080)
+   =========================================== */
+.eyebrow {
+    font-family: var(--font-script); font-size: 30px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-light);
+    display: inline-flex; align-items: center; gap: 12px;
+}
+.eyebrow::before { content: ""; width: 20px; height: 20px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--marker)); box-shadow: inset -2px -2px 3px rgba(0,0,0,.2); }
+
+.hero { font-family: var(--font-display); font-weight: 400; font-size: 118px; line-height: 1.05; letter-spacing: 0.01em; color: var(--ink); }
+.statement { font-family: var(--font-display); font-weight: 400; font-size: 82px; line-height: 1.08; letter-spacing: 0.01em; color: var(--ink); }
+.headline { font-family: var(--font-display); font-weight: 400; font-size: 60px; line-height: 1.1; letter-spacing: 0.01em; color: var(--ink); }
+.note-title { font-family: var(--font-display); font-weight: 400; font-size: 40px; line-height: 1.12; color: var(--ink); }
+
+.body { font-family: var(--font-body); font-size: 29px; font-weight: 400; line-height: 1.55; color: var(--ink-light); }
+.body .hl { color: var(--ink); font-weight: 700; }
+.script { font-family: var(--font-script); font-weight: 500; font-size: 34px; line-height: 1.35; color: var(--ink); }
+.script-lg { font-family: var(--font-script); font-weight: 700; font-size: 48px; line-height: 1.25; color: var(--ink); }
+.cmd { font-family: var(--font-script); font-weight: 700; font-size: 40px; color: var(--marker); }
+
+/* ===========================================
+   POST-IT NOTES  (self-animating, rotation-safe)
+   set --rot inline, e.g. style="--rot:-2deg"
+   =========================================== */
+.note {
+    position: relative; padding: 44px 50px; color: var(--ink);
+    box-shadow: 3px 4px 18px var(--shadow), 0 1px 3px var(--shadow-deep);
+    --rot: 0deg;
+}
+.note.pad-sm { padding: 30px 34px; }
+.note.pad-lg { padding: 56px 64px; }
+.n-yellow { background: linear-gradient(135deg, var(--yellow), var(--yellow-deep)); }
+.n-blue   { background: linear-gradient(135deg, var(--blue), var(--blue-deep)); }
+.n-pink   { background: linear-gradient(135deg, var(--pink), var(--pink-deep)); }
+.n-green  { background: linear-gradient(135deg, var(--green), var(--green-deep)); }
+.n-orange { background: var(--orange); }
+.n-purple { background: var(--purple); }
+.n-white  { background: #fff; border: 2px solid var(--ink); }
+
+/* thumbtack via ::before */
+.pin::before {
+    content: ""; position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 20px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--marker));
+    box-shadow: 0 2px 4px var(--shadow-deep), inset -2px -2px 4px rgba(0,0,0,0.2);
+}
+.pin.pin-blue::before  { background: radial-gradient(circle at 30% 30%, #4dabf7, #1864ab); }
+.pin.pin-green::before { background: radial-gradient(circle at 30% 30%, #69db7c, #2f9e44); }
+.pin.pin-gold::before  { background: radial-gradient(circle at 30% 30%, #ffd43b, #f59f00); }
+/* masking tape via ::after */
+.tape::after {
+    content: ""; position: absolute; top: -16px; left: 50%; transform: translateX(-50%) rotate(-2deg);
+    width: 130px; height: 34px; z-index: 2;
+    background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.35);
+}
+
+/* round stamp — a big feature-icon used for step numbers */
+.stamp {
+    width: 168px; height: 168px; border-radius: 50%; border: 5px solid var(--ink);
+    display: flex; align-items: center; justify-content: center; --rot: 0deg;
+    font-family: var(--font-display); font-size: 84px; color: var(--ink);
+    box-shadow: 3px 4px 18px var(--shadow);
+}
+/* small round marker icon (pipeline numbers) */
+.icon-num {
+    width: 62px; height: 62px; border-radius: 50%; border: 3px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 30px; color: var(--ink); background: #fff;
+}
+
+/* decorative doodles in corners */
+.doodle { position: absolute; opacity: 0.15; pointer-events: none; z-index: 0; }
+.doodle svg { stroke: var(--ink); stroke-width: 3; fill: none; }
+
+/* ===========================================
+   REVEAL — notes/stamps keep their rotation
+   =========================================== */
+.note, .stamp {
+    opacity: 0; transform: rotate(var(--rot)) translateY(34px);
+    transition: opacity var(--dur) ease, transform var(--dur) var(--ease);
+}
+.slide.visible .note, .slide.visible .stamp { opacity: 1; transform: rotate(var(--rot)) translateY(0); }
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity var(--dur) ease, transform var(--dur) var(--ease); }
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .d1 { transition-delay: .08s; }
+.slide.visible .d2 { transition-delay: .18s; }
+.slide.visible .d3 { transition-delay: .30s; }
+.slide.visible .d4 { transition-delay: .42s; }
+.slide.visible .d5 { transition-delay: .54s; }
+.slide.visible .d6 { transition-delay: .66s; }
+
+/* ===========================================
+   LAYOUT HELPERS
+   =========================================== */
+.center-col { display: flex; flex-direction: column; height: 100%; justify-content: center; }
+.stack > * + * { margin-top: 30px; }
+
+/* SLIDE 1 title */
+.title-wrap { display: flex; flex-direction: column; height: 100%; justify-content: center; }
+.title-note { max-width: 1400px; }
+.title-note .hero { margin-bottom: 26px; }
+.title-note .sub { font-family: var(--font-body); font-size: 34px; color: var(--ink); line-height: 1.4; }
+.title-note .sub b { font-weight: 700; }
+.title-chain { position: absolute; bottom: 108px; left: var(--slide-padding); display: flex; align-items: center; gap: 26px; }
+.title-chain .date { font-family: var(--font-script); font-size: 30px; color: var(--ink-light); }
+
+/* SLIDE 2 premise */
+.two-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; max-width: 1500px; margin-top: 8px; }
+.note .lead { font-family: var(--font-script); font-size: 34px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
+.note .txt { font-family: var(--font-body); font-size: 28px; line-height: 1.45; color: var(--ink); }
+
+/* SLIDE 3 pipeline */
+.pipe { display: flex; align-items: center; justify-content: space-between; margin-top: 66px; gap: 6px; }
+.pipe .arrow { font-family: var(--font-script); font-weight: 700; font-size: 60px; color: var(--marker); flex: 0 0 auto; }
+.pipe .note { flex: 1 1 0; min-height: 250px; }
+.pipe .note-title { margin: 14px 0 12px; }
+.pipe .pcmd { font-family: var(--font-script); font-weight: 700; font-size: 30px; color: var(--marker); line-height: 1.3; }
+
+/* SLIDE 4 example */
+.ex-note { max-width: 1420px; margin-top: 44px; }
+.ex-note .tag { font-family: var(--font-script); font-weight: 700; font-size: 34px; color: var(--ink-light); margin-bottom: 18px; }
+.ex-note .feat { font-family: var(--font-display); font-size: 62px; line-height: 1.1; margin-bottom: 22px; color: var(--ink); }
+.ex-note .desc { font-family: var(--font-body); font-size: 30px; line-height: 1.45; color: var(--ink); }
+.ex-note .desc code { font-family: var(--font-script); font-weight: 700; color: var(--marker); font-size: 1.05em; }
+
+/* SLIDE 5–9 step */
+.step-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 72px; height: calc(100% - 8px); align-items: center; }
+.step-left .stamp { margin-bottom: 22px; }
+.step-left .headline { margin: 6px 0 18px; }
+.step-left .cmd { display: block; margin-bottom: 24px; }
+.step-left .body { max-width: 640px; }
+.irl-flag { font-family: var(--font-script); font-weight: 700; font-size: 46px; color: var(--ink); margin-bottom: 22px; display: flex; align-items: center; gap: 12px; }
+.irl-flag .a { color: var(--marker); font-size: 52px; }
+
+/* transcript / list inside notes */
+.tx { font-family: var(--font-body); font-size: 28px; line-height: 1.75; color: var(--ink); }
+.tx .who { font-weight: 700; color: var(--ink); }
+.tx .note-c { font-family: var(--font-script); font-weight: 600; color: var(--ink-light); font-size: 1.05em; }
+.tx .mk { font-weight: 700; color: var(--marker); }
+.ilist { list-style: none; }
+.ilist li { font-family: var(--font-body); font-size: 27px; line-height: 1.4; color: var(--ink);
+    padding: 13px 0 13px 40px; position: relative; }
+.ilist li + li { border-top: 1px dashed rgba(45,42,38,0.28); }
+.ilist li::before { content: "✔"; position: absolute; left: 0; top: 13px; color: var(--marker); font-weight: 700; }
+.ilist li b { font-weight: 700; }
+.ilist.plain li::before { content: "•"; font-size: 30px; top: 10px; }
+.spec-h { font-family: var(--font-script); font-weight: 700; font-size: 30px; color: var(--ink-light); margin-bottom: 8px; }
+
+/* SLIDE 10 takeaway */
+.take .headline { margin: 18px 0 14px; }
+.take .maxim { font-family: var(--font-script); font-weight: 700; font-size: 42px; color: var(--ink); margin-bottom: 50px; }
+.recap { display: flex; gap: 26px; max-width: 1640px; }
+.recap .note { flex: 1; text-align: center; }
+.recap .rstep { font-family: var(--font-script); font-weight: 600; font-size: 26px; color: var(--ink-light); text-transform: uppercase; letter-spacing: 0.08em; }
+.recap .rcmd { font-family: var(--font-display); font-size: 30px; color: var(--ink); margin-top: 12px; word-break: break-word; }
+.take .signoff { position: absolute; bottom: 96px; right: 96px; }
+
+/* handwritten page counter (the only chrome) */
+.page-count { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    font-family: var(--font-script); font-weight: 600; font-size: 30px; color: var(--ink-light); }
+.page-count .cur { color: var(--marker); }
+
+/* inline edit affordance */
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+.edit-toggle { position: fixed; top: 18px; left: 18px; z-index: 10001; opacity: 0; pointer-events: none;
+    transition: opacity .3s ease; background: #fff; border: 2px solid var(--ink); color: var(--ink);
+    border-radius: 0; padding: 10px 14px; font-family: var(--font-script); font-weight: 700; font-size: 24px; cursor: pointer; }
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { border-color: var(--marker); color: var(--marker); }
+[contenteditable="true"] { outline: 2px dashed var(--marker); outline-offset: 6px; }
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+    <!-- ============ 1. TITLE (warm) ============ -->
+    <section class="slide bg-warm active">
+        <div class="doodle" style="top:70px; right:120px;"><svg width="150" height="150"><path d="M10 80 Q40 10 75 70 T140 60"/></svg></div>
+        <div class="title-wrap">
+            <div class="eyebrow reveal d1" style="margin-bottom:34px;">Knowledge share · 5 min</div>
+            <div class="note n-yellow pad-lg pin tape title-note d2" style="--rot:-1.5deg;">
+                <h1 class="hero">How Matt Pocock<br>ships with AI</h1>
+                <p class="sub">A <b>5-step workflow</b> that turns an AI's guesswork into a measurable, repeatable process — walked through one <b>real feature</b> we build live.</p>
+            </div>
+        </div>
+        <div class="title-chain">
+            <div class="note n-blue pad-sm pin pin-blue reveal d4" style="--rot:2.5deg;">
+                <span class="script" style="font-weight:700;">Research → Spec → Tickets → Implement → Review</span>
+            </div>
+            <span class="date reveal d4">2026-07-13</span>
+        </div>
+    </section>
+
+    <!-- ============ 2. PREMISE (paper) ============ -->
+    <section class="slide bg-paper">
+        <div class="doodle" style="bottom:80px; left:90px;"><svg width="120" height="120"><circle cx="60" cy="60" r="46"/></svg></div>
+        <div class="center-col">
+            <div class="eyebrow reveal d1" style="margin-bottom:26px;">The premise</div>
+            <div class="note n-orange pin tape d2" style="--rot:-1.5deg; max-width:1400px; margin-bottom:44px;">
+                <div class="statement">AI <span style="color:var(--marker)">predicts</span> an answer.<br>It doesn't <span style="color:var(--marker)">guarantee</span> one.</div>
+            </div>
+            <div class="two-notes">
+                <div class="note n-pink pin d3" style="--rot:-2deg;">
+                    <div class="lead">Without a workflow</div>
+                    <div class="txt">You dump a vague prompt, get plausible-looking code, and discover the misunderstanding three files later.</div>
+                </div>
+                <div class="note n-green pin pin-green d4" style="--rot:2deg;">
+                    <div class="lead">With a workflow</div>
+                    <div class="txt">Each step frames the next, errors surface early, and the output is measurable — so you can actually improve it.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 3. PIPELINE (cork) ============ -->
+    <section class="slide bg-cork">
+        <div class="eyebrow reveal d1">The pipeline · one idea, five commands</div>
+        <h2 class="headline reveal d2" style="margin-top:24px; color:var(--paper);">Five steps, each a slash command</h2>
+        <div class="pipe">
+            <div class="note n-yellow pin d2" style="--rot:-2deg;"><div class="icon-num">01</div><div class="note-title">Research</div><div class="pcmd">/grill-with-docs<br>/wayfinder</div></div>
+            <span class="arrow reveal d3">→</span>
+            <div class="note n-blue pin pin-blue d3" style="--rot:2deg;"><div class="icon-num">02</div><div class="note-title">Spec</div><div class="pcmd">/to-spec</div></div>
+            <span class="arrow reveal d4">→</span>
+            <div class="note n-pink pin d4" style="--rot:-1.5deg;"><div class="icon-num">03</div><div class="note-title">Tickets</div><div class="pcmd">/to-tickets</div></div>
+            <span class="arrow reveal d5">→</span>
+            <div class="note n-green pin pin-green d5" style="--rot:2.5deg;"><div class="icon-num">04</div><div class="note-title">Implement</div><div class="pcmd">/implement</div></div>
+            <span class="arrow reveal d6">→</span>
+            <div class="note n-orange pin pin-gold d6" style="--rot:-2deg;"><div class="icon-num">05</div><div class="note-title">Review</div><div class="pcmd">/code-review</div></div>
+        </div>
+    </section>
+
+    <!-- ============ 4. RUNNING EXAMPLE (warm) ============ -->
+    <section class="slide bg-warm">
+        <div class="doodle" style="top:90px; right:110px;"><svg width="130" height="130"><path d="M20 20 L110 110 M110 20 L20 110"/></svg></div>
+        <div class="eyebrow reveal d1">Our worked example</div>
+        <h2 class="headline reveal d2" style="margin-top:24px; max-width:1500px;">We run <span style="color:var(--marker)">one real feature</span> through all five steps</h2>
+        <div class="note n-orange pin tape ex-note d3" style="--rot:-1.5deg;">
+            <div class="tag">IRL · a real feature, start to finish</div>
+            <div class="feat">Add “Forgot password?”<br>to the login screen</div>
+            <div class="desc">A user who forgets their password should get a <code>reset link</code> by email, click it, and set a new one — no emailing support, no admin resets.</div>
+        </div>
+    </section>
+
+    <!-- ============ 5. STEP 01 RESEARCH (paper) ============ -->
+    <section class="slide bg-paper">
+        <div class="step-grid">
+            <div class="step-left">
+                <div class="stamp n-blue d1" style="--rot:-3deg;">01</div>
+                <div class="eyebrow reveal d1">Research</div>
+                <h2 class="headline reveal d2">Reach shared<br>understanding first</h2>
+                <span class="cmd reveal d2">/grill-with-docs · /wayfinder</span>
+                <p class="body reveal d3">The AI interviews you <span class="hl">one question at a time</span> until nothing is fuzzy. <span class="hl">/wayfinder</span> maps unknown territory and splits it so multiple agents research in parallel. <span class="hl">No code until you both agree.</span></p>
+            </div>
+            <div class="step-right">
+                <div class="irl-flag reveal d3"><span class="a">↘</span> In real life</div>
+                <div class="note n-blue pin pin-blue d4" style="--rot:1.5deg;">
+                    <div class="tx">
+                        <span class="who">grill ›</span> A reset link, or a 6-digit code?<br>
+                        <span class="who">you ›</span> A link. <span class="note-c">(emailed, single use)</span><br>
+                        <span class="who">grill ›</span> How long until it expires?<br>
+                        <span class="who">you ›</span> 30 minutes, then it's dead.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 6. STEP 02 SPEC (cork) ============ -->
+    <section class="slide bg-cork">
+        <div class="step-grid">
+            <div class="step-left">
+                <div class="stamp n-yellow d1" style="--rot:2.5deg;">02</div>
+                <div class="eyebrow reveal d1" style="color:var(--paper);"><span style="color:var(--paper)">Spec</span></div>
+                <h2 class="headline reveal d2" style="color:var(--paper);">Write down<br>what gets built</h2>
+                <span class="cmd reveal d2" style="color:#ffd43b;">/to-spec &nbsp;<span style="font-size:.7em;color:#e9ddc4;">(was /to-prd)</span></span>
+                <p class="body reveal d3" style="color:#f3ead6;">The agreed understanding becomes a <span style="color:#fff;font-weight:700;">specification</span> — technical <em>and</em> business requirements in one doc. It fixes the <span style="color:#fff;font-weight:700;">boundaries</span> of the change before anyone writes a line.</p>
+            </div>
+            <div class="step-right">
+                <div class="irl-flag reveal d3" style="color:var(--paper);"><span class="a" style="color:#ffd43b;">↘</span> In real life</div>
+                <div class="note n-yellow pin pin-gold d4" style="--rot:-1.5deg;">
+                    <div class="spec-h">spec.md — Password reset</div>
+                    <ul class="ilist plain">
+                        <li>“Forgot password?” → enter email</li>
+                        <li>Email a <b>single-use</b> reset link</li>
+                        <li>Link <b>expires after 30 min</b></li>
+                        <li>Opens a “set new password” page</li>
+                        <li><span class="mk" style="color:var(--marker);font-weight:700;">Out of scope:</span> SMS / 2FA</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 7. STEP 03 TICKETS (paper) ============ -->
+    <section class="slide bg-paper">
+        <div class="step-grid">
+            <div class="step-left">
+                <div class="stamp n-pink d1" style="--rot:-2.5deg;">03</div>
+                <div class="eyebrow reveal d1">Tickets</div>
+                <h2 class="headline reveal d2">Slice it into<br>shippable tasks</h2>
+                <span class="cmd reveal d2">/to-tickets &nbsp;<span style="font-size:.7em;color:var(--ink-light);">(was /to-issues)</span></span>
+                <p class="body reveal d3">The spec becomes <span class="hl">small, ordered tickets</span>, each with its dependencies. Platform-neutral wording, so the same tickets land in Linear, GitHub, wherever.</p>
+            </div>
+            <div class="step-right">
+                <div class="irl-flag reveal d3"><span class="a">↘</span> In real life</div>
+                <div class="note n-pink pin d4" style="--rot:1.5deg;">
+                    <ul class="ilist">
+                        <li><b>T1</b> — Generate &amp; store a reset token <span style="color:var(--ink-light)">(hashed, 30-min TTL)</span></li>
+                        <li><b>T2</b> — <b>POST /forgot</b> → send the reset email <span style="color:var(--ink-light)">(needs T1)</span></li>
+                        <li><b>T3</b> — Reset page: validate token, set new password <span style="color:var(--ink-light)">(needs T1)</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 8. STEP 04 IMPLEMENT (cork) ============ -->
+    <section class="slide bg-cork">
+        <div class="step-grid">
+            <div class="step-left">
+                <div class="stamp n-green d1" style="--rot:3deg;">04</div>
+                <div class="eyebrow reveal d1" style="color:var(--paper);"><span style="color:var(--paper)">Implement</span></div>
+                <h2 class="headline reveal d2" style="color:var(--paper);">Build ticket<br>by ticket</h2>
+                <span class="cmd reveal d2" style="color:#8ce99a;">/implement</span>
+                <p class="body reveal d3" style="color:#f3ead6;"><span style="color:#fff;font-weight:700;">Test-driven where possible.</span> Typecheck and run the single test file often; the full suite at the end. When the ticket is green, it hands straight off to review.</p>
+            </div>
+            <div class="step-right">
+                <div class="irl-flag reveal d3" style="color:var(--paper);"><span class="a" style="color:#8ce99a;">↘</span> In real life</div>
+                <div class="note n-green pin pin-green d4" style="--rot:-1.5deg;">
+                    <div class="tx">
+                        <span class="who">1.</span> test: <b>an expired token → 400</b> <span class="note-c">(red ✗)</span><br>
+                        <span class="who">2.</span> hash token, add 30-min expiry <span class="note-c">(green ✓)</span><br>
+                        <span class="who">3.</span> typecheck · run the reset test file <span class="note-c">✓</span><br>
+                        <span class="who">4.</span> → route to <span class="mk">/code-review</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 9. STEP 05 REVIEW (paper) ============ -->
+    <section class="slide bg-paper">
+        <div class="step-grid">
+            <div class="step-left">
+                <div class="stamp n-orange d1" style="--rot:-3deg;">05</div>
+                <div class="eyebrow reveal d1">Review</div>
+                <h2 class="headline reveal d2">Guard quality<br>&amp; the spec</h2>
+                <span class="cmd reveal d2">/code-review</span>
+                <p class="body reveal d3">Check <span class="hl">correctness</span> and <span class="hl">spec alignment</span>, then readability and maintainability. Catch bad patterns <span class="hl">before</span> the next AI agent copies them everywhere.</p>
+            </div>
+            <div class="step-right">
+                <div class="irl-flag reveal d3"><span class="a">↘</span> In real life</div>
+                <div class="note n-orange pin pin-gold d4" style="--rot:1.5deg;">
+                    <ul class="ilist">
+                        <li><b>Spec check</b> — is the reset link truly single-use? <span class="mk" style="color:var(--marker);font-weight:700;">Yes.</span></li>
+                        <li><b>Security</b> — token <b>hashed</b> at rest, never written to logs?</li>
+                        <li><b>Correctness</b> — expired <em>and</em> reused tokens both rejected?</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ 10. TAKEAWAY (warm) ============ -->
+    <section class="slide bg-warm take">
+        <div class="doodle" style="top:80px; right:120px;"><svg width="140" height="140"><path d="M10 70 Q45 5 80 65 T135 55"/></svg></div>
+        <div class="eyebrow reveal d1">The takeaway</div>
+        <h2 class="headline statement reveal d2" style="margin-top:16px;">Workflows evolve<br>through use.</h2>
+        <div class="maxim reveal d2">measure it → find the friction → improve one step → repeat</div>
+        <div class="recap">
+            <div class="note n-yellow pin d3" style="--rot:-2.5deg;"><div class="rstep">01 Research</div><div class="rcmd">/grill-with-docs</div></div>
+            <div class="note n-blue pin pin-blue d3" style="--rot:2deg;"><div class="rstep">02 Spec</div><div class="rcmd">/to-spec</div></div>
+            <div class="note n-pink pin d4" style="--rot:-1.5deg;"><div class="rstep">03 Tickets</div><div class="rcmd">/to-tickets</div></div>
+            <div class="note n-green pin pin-green d4" style="--rot:2.5deg;"><div class="rstep">04 Implement</div><div class="rcmd">/implement</div></div>
+            <div class="note n-orange pin pin-gold d5" style="--rot:-2deg;"><div class="rstep">05 Review</div><div class="rcmd">/code-review</div></div>
+        </div>
+        <div class="note n-pink pin tape signoff reveal d6" style="--rot:4deg;">
+            <span class="script-lg">thanks — questions?</span>
+        </div>
+    </section>
+
+</main>
+</div>
+
+<!-- grain over everything -->
+<div class="grain"></div>
+
+<!-- handwritten counter (only chrome) -->
+<div class="page-count"><span class="cur" id="curPage">01</span> / <span id="totPage">10</span></div>
+
+<!-- inline edit affordance -->
+<div class="edit-hotzone" id="editHotzone" title="Edit mode"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✎ Edit</button>
+
+<script>
+/* ===========================================
+   SLIDE CONTROLLER — keys / touch / wheel + scaling
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.current = 0;
+        this.stage = document.getElementById('deckStage');
+        this.cur = document.getElementById('curPage');
+        document.getElementById('totPage').textContent = String(this.slides.length).padStart(2, '0');
+        this.scaleStage();
+        window.addEventListener('resize', () => this.scaleStage());
+        this.bindKeys(); this.bindTouch(); this.bindWheel();
+        this.show(0);
+    }
+    scaleStage() {
+        const f = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+        const x = (window.innerWidth - 1920 * f) / 2;
+        const y = (window.innerHeight - 1080 * f) / 2;
+        this.stage.style.transform = `translate(${x}px, ${y}px) scale(${f})`;
+    }
+    show(i) {
+        this.current = Math.max(0, Math.min(i, this.slides.length - 1));
+        this.slides.forEach((s, idx) => {
+            s.classList.toggle('active', idx === this.current);
+            s.classList.toggle('visible', idx === this.current);
+        });
+        this.cur.textContent = String(this.current + 1).padStart(2, '0');
+    }
+    next() { this.show(this.current + 1); }
+    prev() { this.show(this.current - 1); }
+    bindKeys() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+            if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); this.next(); }
+            else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); this.prev(); }
+            else if (e.key === 'Home') { this.show(0); }
+            else if (e.key === 'End') { this.show(this.slides.length - 1); }
+        });
+    }
+    bindTouch() {
+        let x0 = null;
+        window.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        window.addEventListener('touchend', (e) => {
+            if (x0 === null) return;
+            const dx = e.changedTouches[0].clientX - x0;
+            if (Math.abs(dx) > 50) { dx < 0 ? this.next() : this.prev(); }
+            x0 = null;
+        }, { passive: true });
+    }
+    bindWheel() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (lock || Math.abs(e.deltaY) < 24) return;
+            lock = true; e.deltaY > 0 ? this.next() : this.prev();
+            setTimeout(() => { lock = false; }, 700);
+        }, { passive: true });
+    }
+}
+const deck = new SlidePresentation();
+
+/* ===========================================
+   INLINE EDITING (hover top-left / press E)
+   =========================================== */
+const editor = {
+    isActive: false,
+    toggleEditMode() {
+        this.isActive = !this.isActive;
+        const btn = document.getElementById('editToggle');
+        btn.classList.toggle('active', this.isActive);
+        btn.textContent = this.isActive ? '✓ Done' : '✎ Edit';
+        document.querySelectorAll('.slide h1, .slide h2, .slide .body, .slide .txt, .slide .tx, .slide li, .slide .feat, .slide .desc, .slide .maxim, .slide .sub, .slide .note-title, .slide .rcmd, .slide .script, .slide .script-lg')
+            .forEach(el => el.setAttribute('contenteditable', this.isActive ? 'true' : 'false'));
+        if (!this.isActive) this.save();
+    },
+    save() { try { localStorage.setItem('mp-deck-html', document.getElementById('deckStage').innerHTML); } catch (e) {} },
+    restore() { try { const s = localStorage.getItem('mp-deck-html'); if (s) document.getElementById('deckStage').innerHTML = s; } catch (e) {} }
+};
+editor.restore();
+
+const hotzone = document.getElementById('editHotzone');
+const editToggle = document.getElementById('editToggle');
+let hideTimeout = null;
+hotzone.addEventListener('mouseenter', () => { clearTimeout(hideTimeout); editToggle.classList.add('show'); });
+hotzone.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+editToggle.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+editToggle.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+editToggle.addEventListener('click', () => editor.toggleEditMode());
+hotzone.addEventListener('click', () => editor.toggleEditMode());
+document.addEventListener('keydown', (e) => {
+    if ((e.key === 'e' || e.key === 'E') && e.target.getAttribute('contenteditable') !== 'true') editor.toggleEditMode();
+});
+document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); editor.save(); } });
+</script>
+</body>
+</html>

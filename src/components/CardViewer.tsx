@@ -289,7 +289,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
           <button className="btn-ghost" onClick={undo} disabled={history.length === 0}>↩ Undo</button>
           <button className="btn-ghost" onClick={() => commit('left')}>✗ Skip</button>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>drag the card or use ← → · z to undo</span>
-          <button className="btn-done" onClick={() => commit('right')}>✓ Done</button>
+          <button className="btn-done" onClick={() => commit('right')}>✓ Approve</button>
         </div>
       )}
     </div>

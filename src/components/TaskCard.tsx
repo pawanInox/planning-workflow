@@ -196,7 +196,7 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect 
               style={{ height: 28, fontSize: 12, padding: '0 12px', whiteSpace: 'nowrap' }}
               onClick={onToggle}
             >
-              {checked ? '✓ Done' : 'Mark done'}
+              {checked ? '✓ Approved' : 'Approve'}
             </button>
           )}
           <span className="pill" style={{ color: hue, background: `color-mix(in srgb, ${hue} 14%, transparent)`, whiteSpace: 'nowrap' }}>
