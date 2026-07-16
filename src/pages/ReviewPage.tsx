@@ -61,6 +61,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        gap: 8, rowGap: 10, flexWrap: 'wrap',
         padding: '14px 0 10px', borderBottom: '1px solid var(--border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>

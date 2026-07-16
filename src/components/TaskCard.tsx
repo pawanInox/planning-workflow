@@ -118,7 +118,13 @@ const TONES: Record<Tone, { color: string; bg: string }> = {
 
 export function Section({ name, text, tone, large = false }: { name: string; text: string; tone: Tone; large?: boolean }) {
   const c = TONES[tone]
-  const body = { fontSize: large ? 14 : 13, lineHeight: 1.6 }
+  // pixel chrome, crisp content: the dense task prose uses a readable humanist sans
+  // (the pixel faces carry the titles/HUD/labels; this is only the reading text)
+  const body = {
+    fontFamily: '-apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontSize: large ? 15 : 13.5,
+    lineHeight: 1.65,
+  }
   return (
     <div style={{ background: c.bg, borderLeft: `3px solid ${c.color}`, borderRadius: '0 8px 8px 0', padding: '10px 14px', margin: `0 0 ${large ? 14 : 8}px` }}>
       <p style={{ fontSize: large ? 12 : 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: c.color, margin: '0 0 4px' }}>

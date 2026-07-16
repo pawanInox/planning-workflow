@@ -47,8 +47,8 @@ export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, 
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100vh' }}>
-      <span className="blob" style={{ width: 320, height: 320, top: -80, right: -60, background: 'var(--lime)' }} />
-      <span className="blob" style={{ width: 280, height: 280, bottom: -60, left: -80, background: 'var(--card-hue-1)' }} />
+      <span className="blob" style={{ width: 340, height: 340, top: -90, right: -70, background: 'var(--accent)' }} />
+      <span className="blob" style={{ width: 260, height: 260, bottom: -60, left: -80, background: 'var(--card-hue-1)' }} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 16 }}>
         {hasProjects && (
           <button className="btn-ghost" onClick={onShowProjects}>📁 Projects</button>
@@ -56,11 +56,17 @@ export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, 
         <ThemeToggle />
       </div>
       <header style={{ padding: '8px 0 0', textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 4 }}>🃏</div>
-        <h1 style={{ fontSize: 32, fontWeight: 600, margin: 0 }}>Plan to Linear</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '6px 0 0' }}>
-          1 · Paste a plan &nbsp;→&nbsp; 2 · Review card by card &nbsp;→&nbsp; 3 · Ship the done ones to Linear
-        </p>
+        <span className="eyebrow" style={{ display: 'block', marginBottom: 14 }}>◆ quest log ◆</span>
+        <h1 className="serif" style={{ fontSize: 44, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
+          Plan&nbsp;<span style={{ color: 'var(--accent)' }}>→</span>&nbsp;Linear
+        </h1>
+        <div className="eyebrow" style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', margin: '16px 0 0', fontSize: 11 }}>
+          <span><span style={{ color: 'var(--accent)' }}>01</span> paste a plan</span>
+          <span style={{ opacity: 0.4 }}>▸</span>
+          <span><span style={{ color: 'var(--accent)' }}>02</span> review card by card</span>
+          <span style={{ opacity: 0.4 }}>▸</span>
+          <span><span style={{ color: 'var(--accent)' }}>03</span> ship to Linear</span>
+        </div>
       </header>
 
       <textarea

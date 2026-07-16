@@ -1,85 +1,98 @@
+/* ============================================================
+   QUEST LOG — the plan review as an 8-bit RPG quest log, in
+   earth tones (parchment, wood, moss, amber, rust). Hard edges,
+   chunky borders, no-blur pixel shadows. Values are repointed
+   onto the existing token names so every inline style re-skins.
+   ============================================================ */
 :root {
-  --bg: #f3efe4;
-  --surface: #fbf9f2;
-  --border: #e0dbc9;
-  --text: #15372c;
-  --text-muted: #5f6f60;
-  --accent: #15372c;
-  --on-accent: #f3efe4;
-  --accent-hover: #1d4a3b;
-  --lime: #c9f158;
-  --on-lime: #1c3a12;
-  --badge-bg: #e4efce;
-  --badge-text: #3b5a14;
-  --warn: #854f0b;
-  --warn-border: #ef9f27;
-  --danger: #a32d2d;
-  --danger-border: #e24b4a;
-  --success: #0f6e56;
-  --success-border: #1d9e75;
-  --radius: 14px;
-  --serif: "Fraunces", Georgia, serif;
+  --bg: #cdb891;          /* sun-baked sand / parchment field */
+  --surface: #efe3c6;     /* light parchment panel */
+  --border: #6b4a2a;      /* wood-brown, chunky */
+  --text: #3a2a18;        /* dark bark ink */
+  --text-muted: #86694a;
+  --accent: #b06a2c;      /* burnt amber — coins / XP / primary */
+  --on-accent: #f5e9cf;
+  --accent-hover: #99591f;
+  --lime: #5f7d34;        /* moss green — "approve / accept quest" */
+  --on-lime: #f2ecd6;
+  --badge-bg: #e0cfa4;    /* worn parchment tag */
+  --badge-text: #6b4a2a;
+  --warn: #9a5b12;
+  --warn-border: #c98a2c;
+  --danger: #a23b28;
+  --danger-border: #c8543a;
+  --success: #4f7a2f;
+  --success-border: #6b9a44;
+  --radius: 0px;          /* pixel-box chrome keeps hard edges; type is now the readable sans */
+  --ui: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: var(--ui);   /* display (name kept for refs) — now the readable sans */
+  --pixel: var(--ui);   /* HUD/labels — now the readable sans too */
+  --shadow-color: rgba(58, 42, 24, 0.32);
+  --shadow: 5px 5px 0 var(--shadow-color); /* hard, no-blur pixel drop shadow */
 
-  --sec-problem: #a8451f;
-  --sec-problem-bg: #f7e8de;
-  --sec-action: #1d4a3b;
-  --sec-action-bg: #e5eee2;
-  --sec-outcome: #5a7108;
-  --sec-outcome-bg: #eef3d6;
+  /* section tones = the three faces of a quest: peril / plan / reward */
+  --sec-problem: #a23b28;   /* rust — the peril */
+  --sec-problem-bg: #ecd6bd;
+  --sec-action: #3f6b5e;    /* pine — what to do */
+  --sec-action-bg: #dbe0c4;
+  --sec-outcome: #8a6a1f;   /* ochre gold — the reward */
+  --sec-outcome-bg: #ecdcac;
 
-  --card-hue-0: #1d4a3b;
-  --card-hue-1: #a8451f;
-  --card-hue-2: #7a8f1c;
-  --card-hue-3: #8c4a72;
-  --card-hue-4: #b0762a;
-  --card-hue-5: #2c6b74;
-
-  --shadow: 0 12px 32px rgba(21, 55, 44, 0.10);
+  /* task hues — earthy party of six */
+  --card-hue-0: #5f7d34;    /* moss */
+  --card-hue-1: #a23b28;    /* rust */
+  --card-hue-2: #8a6a1f;    /* ochre */
+  --card-hue-3: #3f6b5e;    /* pine */
+  --card-hue-4: #b06a2c;    /* amber */
+  --card-hue-5: #7a4a52;    /* plum-brown */
 }
 
 :root[data-theme='dark'] {
-  --bg: #101b15;
-  --surface: #18271f;
-  --border: #2e4033;
-  --text: #e9efe0;
-  --text-muted: #9db3a0;
-  --accent: #c9f158;
-  --on-accent: #1c3a12;
-  --accent-hover: #d8f97e;
-  --lime: #c9f158;
-  --on-lime: #1c3a12;
-  --badge-bg: #2c3d1a;
-  --badge-text: #d3ed92;
-  --warn: #fac775;
-  --warn-border: #854f0b;
-  --danger: #f09595;
-  --danger-border: #791f1f;
-  --success: #9fe1cb;
-  --success-border: #085041;
+  --bg: #241c14;          /* deep soil — the dungeon */
+  --surface: #35291c;     /* dark wood panel */
+  --border: #7a5a34;      /* lit wood edge */
+  --text: #ecdcbd;        /* torchlit parchment */
+  --text-muted: #a88f6a;
+  --accent: #d69a4c;      /* amber glows in the dark */
+  --on-accent: #241c14;
+  --accent-hover: #e7ab5d;
+  --lime: #8bad52;        /* moss brightens */
+  --on-lime: #1c2410;
+  --badge-bg: #43331f;
+  --badge-text: #e0c790;
+  --warn: #e0a94c;
+  --warn-border: #7a521a;
+  --danger: #e08163;
+  --danger-border: #7a2e20;
+  --success: #9cc26a;
+  --success-border: #3f5a28;
 
-  --sec-problem: #f0a483;
-  --sec-problem-bg: #33221a;
-  --sec-action: #a4ceb2;
-  --sec-action-bg: #1c3128;
-  --sec-outcome: #d3ed92;
-  --sec-outcome-bg: #263014;
+  --sec-problem: #e08163;
+  --sec-problem-bg: #33231a;
+  --sec-action: #7fae9c;
+  --sec-action-bg: #22301f;
+  --sec-outcome: #e0be6a;
+  --sec-outcome-bg: #33291a;
 
-  --card-hue-0: #a4ceb2;
-  --card-hue-1: #f0a483;
-  --card-hue-2: #cbe36a;
-  --card-hue-3: #e0a4c8;
-  --card-hue-4: #eec27a;
-  --card-hue-5: #8fd0d9;
+  --card-hue-0: #a3c46a;
+  --card-hue-1: #e08163;
+  --card-hue-2: #e0be6a;
+  --card-hue-3: #7fae9c;
+  --card-hue-4: #e0a94c;
+  --card-hue-5: #c98f97;
 
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --shadow: 5px 5px 0 var(--shadow-color);
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, system-ui, sans-serif;
+  font-family: var(--ui);
   background: var(--bg);
-  background-image: radial-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px);
-  background-size: 26px 26px;
+  /* pixel dither: a faint 2px checker so the ground reads hand-placed, not flat */
+  background-image:
+    linear-gradient(45deg, color-mix(in srgb, var(--border) 22%, transparent) 25%, transparent 25%, transparent 75%, color-mix(in srgb, var(--border) 22%, transparent) 75%);
+  background-size: 6px 6px;
   color: var(--text);
 }
 
@@ -117,98 +130,126 @@ body {
 * { box-sizing: border-box; }
 textarea, select, button { font: inherit; color: inherit; }
 
-h1, h2, .serif { font-family: var(--serif); }
+h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0; }
+
+/* 8-bit micro label ("QUEST", section names, steps) — Press Start 2P, tiny, tracked */
+.eyebrow {
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
 
 .inline-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.88em;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1px 5px;
+  font-size: 0.86em;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 0;
+  padding: 0 5px;
   overflow-wrap: break-word;
 }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 3px solid var(--border);
+  border-radius: 0;
   padding: 18px 22px;
+  box-shadow: var(--shadow);
 }
 
 .pill {
+  font-family: var(--serif);
   font-size: 12px;
   font-weight: 600;
-  border-radius: 999px;
-  padding: 3px 12px;
+  border-radius: 0;
+  border: 2px solid currentColor;
+  padding: 1px 8px;
 }
 
 .control {
   height: 40px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  border-radius: 0;
+  border: 3px solid var(--border);
   background: var(--surface);
   padding: 0 16px;
+  font-family: var(--serif);
 }
 
+/* pixel buttons: hard border + no-blur offset shadow, and a real "press" that sinks into the shadow */
 .btn-primary {
   height: 40px;
-  border-radius: 999px;
-  border: none;
+  border-radius: 0;
+  border: 3px solid var(--border);
   background: var(--accent);
   color: var(--on-accent);
+  font-family: var(--serif);
   font-weight: 600;
   padding: 0 20px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+  box-shadow: 4px 4px 0 var(--shadow-color);
+  transition: background 0.1s ease, transform 0.06s ease, box-shadow 0.06s ease;
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:active:not(:disabled) { transform: scale(0.97); }
-.btn-primary:disabled { opacity: 0.5; cursor: default; }
+.btn-primary:active:not(:disabled) { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--shadow-color); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 
 .btn-ghost {
   height: 34px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  background: var(--surface);
+  font-family: var(--serif);
   padding: 0 14px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 var(--shadow-color);
+  transition: background 0.1s ease, transform 0.06s ease, box-shadow 0.06s ease;
 }
-.btn-ghost:hover:not(:disabled) { background: var(--surface); }
-.btn-ghost:disabled { opacity: 0.4; cursor: default; }
-/* the :hover selector above is more specific than .active alone — without the :hover variant here,
-   hovering an active toggle paints --surface under --on-accent text (invisible label) */
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+.btn-ghost:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--shadow-color); }
+.btn-ghost:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 .btn-ghost.active,
-.btn-ghost.active:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn-ghost.active:hover:not(:disabled) { background: var(--accent); border-color: var(--border); color: var(--on-accent); }
 
 .btn-done {
   height: 40px;
-  border-radius: 999px;
-  border: none;
+  border-radius: 0;
+  border: 3px solid var(--border);
   background: var(--lime);
   color: var(--on-lime);
+  font-family: var(--serif);
   font-weight: 600;
   padding: 0 20px;
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.15s ease;
+  box-shadow: 4px 4px 0 var(--shadow-color);
+  transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
 }
-.btn-done:hover { filter: brightness(1.05); }
-.btn-done:active { transform: scale(0.95); }
+.btn-done:hover { filter: brightness(1.06); }
+.btn-done:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--shadow-color); }
 .btn-done.checked { background: var(--badge-bg); color: var(--badge-text); }
 
+/* XP bar — segmented pixel blocks instead of a smooth fill */
 .progress-track {
   flex: 1;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--border);
+  height: 14px;
+  border-radius: 0;
+  border: 2px solid var(--border);
+  background: color-mix(in srgb, var(--border) 30%, var(--surface));
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  border-radius: 999px;
-  background: var(--lime);
-  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(90deg, var(--lime) 0 8px, transparent 8px 10px),
+    var(--lime);
+  background-blend-mode: overlay;
+  transition: width 0.4s steps(12, end);
 }
 
 .deck {
@@ -224,12 +265,23 @@ h1, h2, .serif { font-family: var(--serif); }
   flex-direction: column;
   overflow-y: auto;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 24px;
+  border: 3px solid var(--border);
+  border-radius: 0;
   padding: 28px 32px;
   touch-action: pan-y;
   box-shadow: var(--shadow);
 }
+/* RPG dialog box — a solid inner rule makes each quest card a double-framed panel */
+.deck-card::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 2px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.deck-card > * { position: relative; z-index: 1; }
 
 .meme-skel {
   height: 120px;
@@ -252,25 +304,26 @@ h1, h2, .serif { font-family: var(--serif); }
   position: absolute;
   top: 22px;
   z-index: 5;
+  font-family: var(--ui);
   font-weight: 800;
-  font-size: 20px;
-  letter-spacing: 2px;
+  font-size: 18px;
+  letter-spacing: 1.5px;
   border: 3px solid;
-  border-radius: 10px;
-  padding: 4px 14px;
+  border-radius: 0;
+  padding: 5px 12px;
   pointer-events: none;
   background: var(--surface);
 }
 
 .level-num {
   position: absolute;
-  top: 8px;
-  right: 20px;
-  font-family: var(--serif);
-  font-size: 96px;
-  font-weight: 700;
+  top: 10px;
+  right: 24px;
+  font-family: var(--ui);
+  font-size: 78px;
+  font-weight: 800;
   line-height: 1;
-  opacity: 0.07;
+  opacity: 0.08;
   pointer-events: none;
   user-select: none;
 }

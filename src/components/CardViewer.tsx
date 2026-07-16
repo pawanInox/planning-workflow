@@ -247,8 +247,8 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                   <span className="icon-hero" style={{ background: `color-mix(in srgb, ${cardHue(taskIdx)} 16%, transparent)` }}>
                     {taskIcon(t)}
                   </span>
-                  <span className="pill" style={{ color: 'var(--on-lime)', background: 'var(--lime)' }}>
-                    Level {taskIdx + 1} of {tasks.length}
+                  <span className="pill" style={{ color: 'var(--on-lime)', background: 'var(--lime)', fontFamily: 'var(--ui)', fontWeight: 700, fontSize: 12, padding: '2px 9px', letterSpacing: '0.08em' }}>
+                    QUEST {String(taskIdx + 1).padStart(2, '0')}/{String(tasks.length).padStart(2, '0')}
                   </span>
                   <span style={{ marginLeft: 'auto' }}>
                     <CopyPromptButton task={t} />
