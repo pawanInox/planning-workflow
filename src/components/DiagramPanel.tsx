@@ -6,6 +6,52 @@ const loadMermaid = () => (mermaidP ??= import('mermaid').then(m => m.default))
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+// sequence diagrams have no classDef/class — highlight the rendered SVG instead. The task's
+// participants (diagramNodes) get tinted boxes, and every message whose BOTH endpoints belong to
+// the task lights up while the rest of the diagram dims — so the task's segment of the flow pops.
+function highlightActors(root: HTMLElement, source: string, ids: string[]) {
+  const labels = new Map<string, string>()
+  for (const m of source.matchAll(/^\s*(?:participant|actor)\s+([A-Za-z0-9_]+)(?:\s+as\s+(.+?))?\s*$/gm))
+    labels.set(m[1], (m[2] ?? m[1]).trim())
+  const wanted = new Set(ids.map(id => labels.get(id) ?? id))
+
+  // actor boxes: tint the task's, dim the rest; remember the x-center of each tinted lifeline
+  const hotX: number[] = []
+  root.querySelectorAll('text').forEach(t => {
+    const rect = t.previousElementSibling as SVGRectElement | null
+    if (rect?.tagName.toLowerCase() !== 'rect') return
+    if (wanted.has(t.textContent?.trim() ?? '')) {
+      rect.setAttribute('stroke', '#7c5cff')
+      rect.setAttribute('stroke-width', '3')
+      rect.setAttribute('fill', '#7c5cff33')
+      hotX.push(parseFloat(rect.getAttribute('x') ?? '0') + parseFloat(rect.getAttribute('width') ?? '0') / 2)
+    } else {
+      rect.setAttribute('opacity', '0.35')
+      t.setAttribute('opacity', '0.35')
+    }
+  })
+  // message lines start/end a few px off the lifeline center (activation margin) — 12px is well
+  // under the ~110px minimum gap between adjacent lifelines
+  const hot = (v: number) => hotX.some(x => Math.abs(x - v) < 12)
+
+  // messages: bright purple when both endpoints sit on the task's lifelines, dimmed otherwise
+  const lines = [...root.querySelectorAll('line')].filter(l => (l.getAttribute('class') ?? '').includes('messageLine'))
+  const texts = [...root.querySelectorAll('text.messageText')]
+  lines.forEach((l, i) => {
+    const active = hot(parseFloat(l.getAttribute('x1') ?? '-1')) && hot(parseFloat(l.getAttribute('x2') ?? '-1'))
+    const label = texts.length === lines.length ? texts[i] : null
+    if (active) {
+      l.setAttribute('stroke', '#7c5cff')
+      l.setAttribute('stroke-width', '2.5')
+      label?.setAttribute('fill', '#7c5cff')
+      label?.setAttribute('font-weight', '700')
+    } else {
+      l.setAttribute('opacity', '0.22')
+      label?.setAttribute('opacity', '0.22')
+    }
+  })
+}
+
 export function DiagramPanel({ source, highlightNodes = [] }: {
   source: string
   highlightNodes?: string[]
@@ -13,10 +59,61 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
   const ref = useRef<HTMLDivElement>(null)
   const seq = useRef(0)
   const [error, setError] = useState('')
+  const [zoom, setZoom] = useState(1)
+  const zoomLevel = useRef(1) // mirror of `zoom` readable from the render effect without re-rendering mermaid
+
+  // zoom = widen the svg past its fit width; .diagram-col's overflow:auto provides the panning
+  const applyZoom = () => {
+    const svg = ref.current?.querySelector('svg')
+    if (!svg) return
+    const z = zoomLevel.current
+    svg.style.maxWidth = z === 1 ? '100%' : 'none'
+    svg.style.width = z === 1 ? '' : `${z * 100}%`
+  }
+  useEffect(() => { zoomLevel.current = zoom; applyZoom() }, [zoom])
+
+  // drag-to-pan while zoomed: the card scrolls on both axes, so panning just moves its scroll offset
+  const cardRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ x: number; y: number; sl: number; st: number } | null>(null)
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (zoom === 1 || (e.target as Element).closest('button')) return
+    const card = cardRef.current
+    if (!card) return
+    drag.current = { x: e.clientX, y: e.clientY, sl: card.scrollLeft, st: card.scrollTop }
+    card.setPointerCapture(e.pointerId)
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    const card = cardRef.current
+    if (!drag.current || !card) return
+    card.scrollLeft = drag.current.sl - (e.clientX - drag.current.x)
+    card.scrollTop = drag.current.st - (e.clientY - drag.current.y)
+  }
+  const endDrag = () => { drag.current = null }
+
+  // trackpad ZOOM only on pinch (mac pinch = ctrlKey wheel event). A plain two-finger swipe is a
+  // pan gesture — leave it to native scroll (card scrolls x, .diagram-col scrolls y) so the user
+  // can move around a zoomed diagram without it zooming. Native listener because React's onWheel
+  // is passive (preventDefault would be ignored).
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return // plain wheel / two-finger swipe → pan, don't zoom
+      // pinch over the diagram is always ours — swallow it even at min/max so the browser
+      // never page-zooms the whole site
+      e.preventDefault()
+      const next = Math.min(4, Math.max(1, +(zoomLevel.current * Math.exp(-e.deltaY * 0.01)).toFixed(3)))
+      if (next !== zoomLevel.current) setZoom(next)
+    }
+    card.addEventListener('wheel', onWheel, { passive: false })
+    return () => card.removeEventListener('wheel', onWheel)
+  }, [])
 
   // only highlight ids present in the source — a mermaid `class` line CREATES unknown ids as stray nodes
   const ids = highlightNodes.filter(id => new RegExp(`\\b${escapeRe(id)}\\b`).test(source))
-  const src = ids.length
+  // classDef/class are flowchart-only syntax; a sequenceDiagram gets its highlight post-render
+  const isFlowchart = /^\s*(graph|flowchart)\b/.test(source.trimStart())
+  const src = isFlowchart && ids.length
     ? `${source}\nclassDef current fill:#7c5cff33,stroke:#7c5cff,stroke-width:3px\nclass ${ids.join(',')} current`
     : source
 
@@ -28,18 +125,52 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
       mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'neutral' })
       try {
         const { svg } = await mermaid.render(`diagram-${n}`, src)
-        if (seq.current === n && ref.current) { ref.current.innerHTML = svg; setError('') }
+        if (seq.current === n && ref.current) {
+          ref.current.innerHTML = svg
+          if (!isFlowchart && ids.length) highlightActors(ref.current, source, ids)
+          applyZoom()
+          setError('')
+        }
       } catch (e: any) {
         document.getElementById(`diagram-${n}`)?.remove() // mermaid leaves a temp element behind on parse errors
         if (seq.current === n) setError(String(e?.message ?? e))
       }
     })
-  }, [src])
+  }, [src, ids.join(',')]) // ids matter on their own for sequence diagrams, where src never embeds them
 
+  const zoomBtn: React.CSSProperties = { height: 26, padding: '0 10px', fontSize: 13, lineHeight: 1 }
   return (
-    <div className="card" style={{ padding: 12, overflowX: 'auto' }}>
-      {error && <div style={{ fontSize: 13, color: 'var(--warn)' }}>⚠ Diagram failed to render: {error}</div>}
-      <div ref={ref} style={{ display: error ? 'none' : undefined, textAlign: 'center' }} />
+    <div className="dpanel">
+      <div
+        ref={cardRef}
+        className="card"
+        style={{
+          padding: 12, overflowX: 'auto',
+          cursor: zoom > 1 ? 'grab' : undefined,
+          userSelect: zoom > 1 ? 'none' : undefined,
+          touchAction: zoom > 1 ? 'none' : undefined,
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        {error && <div style={{ fontSize: 13, color: 'var(--warn)' }}>⚠ Diagram failed to render: {error}</div>}
+        <div ref={ref} style={{ display: error ? 'none' : undefined, textAlign: 'center' }} />
+      </div>
+      {/* pinned OUTSIDE the scroller so zooming, panning, and the appearing "fit" never move the buttons */}
+      <div style={{
+        position: 'absolute', top: 8, left: 8, zIndex: 5, display: 'flex', gap: 4, alignItems: 'center',
+        background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 999, padding: '3px 6px',
+      }}>
+        <button className="btn-ghost" style={zoomBtn} title="Zoom out" disabled={zoom <= 1}
+          onClick={() => setZoom(z => Math.max(1, +(z - 0.25).toFixed(2)))}>−</button>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 38, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+        <button className="btn-ghost" style={zoomBtn} title="Zoom in" disabled={zoom >= 4}
+          onClick={() => setZoom(z => Math.min(4, +(z + 0.25).toFixed(2)))}>+</button>
+        <button className="btn-ghost" style={{ ...zoomBtn, visibility: zoom === 1 ? 'hidden' : undefined }}
+          title="Fit to panel" onClick={() => setZoom(1)}>fit</button>
+      </div>
     </div>
   )
 }

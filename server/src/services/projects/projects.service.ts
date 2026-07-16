@@ -3,10 +3,10 @@ import { NotFoundError } from '../errors.ts'
 
 /** Input shape is validated by `schemas/projects.schema.ts` at the route; this layer holds business rules only. */
 export interface ProjectsService {
-  createProject(data: { title: string; tasks: NewTask[]; diagram?: string }): Promise<ProjectWithTasks>
+  createProject(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
   listProjects(): Promise<ProjectSummary[]>
   getProject(id: string): Promise<ProjectWithTasks>
-  updateProject(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string }): Promise<ProjectWithTasks>
+  updateProject(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
   deleteProject(id: string): Promise<void>
   addTask(projectId: string, task: NewTask): Promise<TaskEntity>
   updateTask(projectId: string, taskId: string, patch: Partial<NewTask>): Promise<TaskEntity>

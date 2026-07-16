@@ -5,7 +5,7 @@ export type SavedTask = {
   id: string; title: string; problem: string; todo: string; outcome: string
   dependsOn: Dep[]; done: boolean; diagramNodes?: string[]
 }
-export type ProjectWithTasks = { id: string; title: string; diagram?: string; tasks: SavedTask[] }
+export type ProjectWithTasks = { id: string; title: string; diagram?: string; sequenceDiagram?: string; tasks: SavedTask[] }
 export type TaskPayload = Omit<SavedTask, 'id'>
 export type Team = { id: string; name: string; key: string }
 export type CreatedIssue = { title: string; url: string }

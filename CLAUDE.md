@@ -21,9 +21,9 @@ Use this to read or edit a user's plan while they review it in the app — the r
 | Method & path | Body | `data` |
 |---|---|---|
 | `GET /api/v1/projects` | — | `[{ id, title, taskCount, doneCount, updatedAt }]` |
-| `POST /api/v1/projects` | `{ title, tasks: [Task], diagram? }` | 201, project + tasks (with ids, ordered) |
-| `GET /api/v1/projects/:id` | — | project (incl. `diagram` if set) + `tasks` sorted by `order`, each with its own `id` |
-| `PUT /api/v1/projects/:id` | `{ title?, tasks?, diagram? }` | tasks value replaces ALL tasks (new ids) |
+| `POST /api/v1/projects` | `{ title, tasks: [Task], diagram?, sequenceDiagram? }` | 201, project + tasks (with ids, ordered) |
+| `GET /api/v1/projects/:id` | — | project (incl. `diagram`/`sequenceDiagram` if set) + `tasks` sorted by `order`, each with its own `id` |
+| `PUT /api/v1/projects/:id` | `{ title?, tasks?, diagram?, sequenceDiagram? }` | tasks value replaces ALL tasks (new ids) |
 | `DELETE /api/v1/projects/:id` | — | 200, cascades tasks |
 | `POST /api/v1/projects/:id/tasks` | `Task` | 201, appended task |
 | `PATCH /api/v1/projects/:id/tasks/:taskId` | any subset of Task fields | updated task |
@@ -41,4 +41,4 @@ curl -X PATCH localhost:3001/api/v1/projects/$PID/tasks/$TID \
 
 Avoid `PUT` with `tasks` while a user is mid-review unless asked — it recreates every task with new ids.
 
-`diagram` is the project's mermaid architecture flowchart (source text), generated at planning time (see `docs/adr/0001`); `diagramNodes` on a task lists the diagram node ids that task touches — the review screen highlights them. The app never generates diagrams; a `PUT { diagram }` (without `tasks`) or `PATCH { diagramNodes }` is the way to fix one up.
+`diagram` is the project's mermaid architecture flowchart and `sequenceDiagram` its mermaid sequence diagram (both source text), generated at planning time (see `docs/adr/0001`); the review screen shows a Flowchart/Sequence toggle when both exist. Sequence participant ids must reuse the flowchart's node ids (`participant apiServer as ...`). `diagramNodes` on a task lists the node ids that task touches — the review screen glows those flowchart nodes, and in the sequence view brightens the messages between those participants while dimming the rest. The app never generates diagrams; a `PUT { diagram }` / `PUT { sequenceDiagram }` (without `tasks`) or `PATCH { diagramNodes }` is the way to fix one up.

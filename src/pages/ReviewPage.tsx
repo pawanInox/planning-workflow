@@ -5,7 +5,7 @@ import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { DiagramPanel } from '../components/DiagramPanel'
 
-export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, taskNodes }: {
+export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, seqDiagram = '', taskNodes }: {
   planTitle: string
   tasks: Task[]
   done: Set<number>
@@ -17,10 +17,14 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   onBack: () => void
   onShip: () => void
   diagram: string
+  seqDiagram?: string
   taskNodes: string[][]
 }) {
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
+  // which diagram to render when the project has both; fall back to whichever exists
+  const [diagramKind, setDiagramKind] = useState<'flow' | 'seq'>('flow')
+  const shownDiagram = diagramKind === 'seq' && seqDiagram ? seqDiagram : diagram || seqDiagram
   const active = view === 'focus' ? focusTop : selected
   const body = view === 'focus' ? (
     <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
@@ -48,12 +52,12 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
           next.has(i) ? next.delete(i) : next.add(i)
           return next
         })}
-        onSelect={diagram ? () => setSelected(i) : undefined}
+        onSelect={shownDiagram ? () => setSelected(i) : undefined}
       />
     ))}
   </>)
   return (
-    <div style={{ maxWidth: diagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -76,10 +80,20 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         </div>
       </header>
 
-      {diagram ? (
+      {diagram || seqDiagram ? (
         <div className="review-split">
           <div className="diagram-col">
-            <DiagramPanel source={diagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
+            {diagram && seqDiagram && (
+              <div className="diagram-toggle" style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <button className={`btn-ghost${diagramKind === 'flow' ? ' active' : ''}`} onClick={() => setDiagramKind('flow')}>
+                  🗺 Flowchart
+                </button>
+                <button className={`btn-ghost${diagramKind === 'seq' ? ' active' : ''}`} onClick={() => setDiagramKind('seq')}>
+                  ⇄ Sequence
+                </button>
+              </div>
+            )}
+            <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             {body}

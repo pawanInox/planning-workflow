@@ -25,6 +25,8 @@ export type Project = {
   title: string
   /** Mermaid source of the project's architecture flowchart, generated at planning time. */
   diagram?: string
+  /** Mermaid source of the project's sequence diagram (participant ids match `diagram`'s node ids). */
+  sequenceDiagram?: string
   createdAt: Date
   updatedAt: Date
 }

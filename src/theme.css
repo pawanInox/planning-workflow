@@ -177,7 +177,10 @@ h1, h2, .serif { font-family: var(--serif); }
 }
 .btn-ghost:hover:not(:disabled) { background: var(--surface); }
 .btn-ghost:disabled { opacity: 0.4; cursor: default; }
-.btn-ghost.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* the :hover selector above is more specific than .active alone — without the :hover variant here,
+   hovering an active toggle paints --surface under --on-accent text (invisible label) */
+.btn-ghost.active,
+.btn-ghost.active:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .btn-done {
   height: 40px;
@@ -299,18 +302,32 @@ h1, h2, .serif { font-family: var(--serif); }
 .review-split > .diagram-col {
   position: sticky;
   top: 66px; /* clears the sticky review header (~65px tall) */
-  max-height: calc(100vh - 78px);
-  overflow: auto;
-}
-/* fill the column so the diagram card matches the task column's height */
-.diagram-col > .card {
-  min-height: 100%;
+  height: calc(100vh - 78px); /* definite height so the inner card gets a bounded box to scroll within */
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  overflow: hidden; /* the card scrolls internally — the column stays put so the toggle/zoom chrome doesn't move */
+}
+/* diagram-type toggle stays fixed at the top of the column while the diagram scrolls */
+.diagram-col > .diagram-toggle { flex-shrink: 0; }
+/* .dpanel is a non-scrolling wrapper that hosts the pinned zoom controls */
+.diagram-col > .dpanel {
+  flex: 1;
+  min-height: 0; /* let the card scroll instead of growing the column */
+  position: relative;
+  display: flex;
+}
+.dpanel > .card {
+  flex: 1;
+  min-width: 0;
+  overflow: auto; /* both axes scroll HERE now, so the pinned zoom controls (on .dpanel) don't move */
+  overscroll-behavior: contain; /* at the diagram's scroll edge, don't chain the scroll to the page */
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center; /* center when it fits; align to start when scrollable so the top isn't clipped */
 }
 .diagram-col svg { max-width: 100%; height: auto; }
 @media (max-width: 1023px) {
   .review-split { grid-template-columns: minmax(0, 1fr); }
-  .review-split > .diagram-col { position: static; max-height: none; }
+  .review-split > .diagram-col { position: static; height: auto; overflow: visible; }
+  .diagram-col > .dpanel { min-height: auto; }
 }

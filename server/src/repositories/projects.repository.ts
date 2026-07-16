@@ -4,8 +4,12 @@ import { ProjectModel, toProject } from '../models/projects/project.model.ts'
 import { TaskModel, toTask } from '../models/tasks/task.model.ts'
 
 export class MongooseProjectRepository implements ProjectRepository {
-  async create({ title, tasks, diagram }: { title: string; tasks: NewTask[]; diagram?: string }): Promise<ProjectWithTasks> {
-    const p = await ProjectModel.create(diagram !== undefined ? { title, diagram } : { title })
+  async create({ title, tasks, diagram, sequenceDiagram }: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks> {
+    const p = await ProjectModel.create({
+      title,
+      ...(diagram !== undefined ? { diagram } : {}),
+      ...(sequenceDiagram !== undefined ? { sequenceDiagram } : {}),
+    })
     const docs = tasks.length
       ? await TaskModel.insertMany(tasks.map((t, i) => ({ ...t, projectId: p._id, order: i })))
       : []
@@ -31,10 +35,14 @@ export class MongooseProjectRepository implements ProjectRepository {
     return { ...toProject(p), tasks: tasks.map(toTask) }
   }
 
-  async update(id: string, { title, tasks, diagram }: { title?: string; tasks?: NewTask[]; diagram?: string }): Promise<ProjectWithTasks | null> {
+  async update(id: string, { title, tasks, diagram, sequenceDiagram }: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks | null> {
     const _id = oid(id)
     if (!_id) return null
-    const patch = { ...(title !== undefined ? { title } : {}), ...(diagram !== undefined ? { diagram } : {}) }
+    const patch = {
+      ...(title !== undefined ? { title } : {}),
+      ...(diagram !== undefined ? { diagram } : {}),
+      ...(sequenceDiagram !== undefined ? { sequenceDiagram } : {}),
+    }
     const p = await ProjectModel.findByIdAndUpdate(_id, patch, { new: true })
     if (!p) return null
     if (tasks !== undefined) {

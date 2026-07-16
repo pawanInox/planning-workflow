@@ -20,6 +20,7 @@ export const createProjectSchema = {
     title: z.string().trim().min(1, 'project title must be a non-empty string'),
     tasks: z.array(taskSchema).default([]),
     diagram: z.string().trim().min(1, 'diagram may not be an empty string').optional(),
+    sequenceDiagram: z.string().trim().min(1, 'sequenceDiagram may not be an empty string').optional(),
   }),
 }
 
@@ -28,6 +29,7 @@ export const updateProjectSchema = {
     title: z.string().trim().min(1, 'project title must be a non-empty string').optional(),
     tasks: z.array(taskSchema).optional(),
     diagram: z.string().trim().min(1, 'diagram may not be an empty string').optional(),
+    sequenceDiagram: z.string().trim().min(1, 'sequenceDiagram may not be an empty string').optional(),
   }),
 }
 

@@ -1,11 +1,11 @@
 import type { NewTask, Project, ProjectSummary, ProjectWithTasks, TaskEntity } from '../models/entities.ts'
 
 export interface ProjectRepository {
-  create(data: { title: string; tasks: NewTask[]; diagram?: string }): Promise<ProjectWithTasks>
+  create(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
   list(): Promise<ProjectSummary[]>
   getById(id: string): Promise<ProjectWithTasks | null>
   /** A `tasks` value replaces all of the project's tasks. */
-  update(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string }): Promise<ProjectWithTasks | null>
+  update(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks | null>
   /** Cascades the project's tasks. */
   delete(id: string): Promise<boolean>
 }

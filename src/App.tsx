@@ -22,6 +22,7 @@ export function App() {
   const [projectId, setProjectId] = useState<string | null>(null)
   const [taskIds, setTaskIds] = useState<(string | undefined)[]>([])
   const [diagram, setDiagram] = useState('')
+  const [seqDiagram, setSeqDiagram] = useState('')
   const [taskNodes, setTaskNodes] = useState<string[][]>([]) // diagram node ids per task, index-aligned with tasks
   const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([])
   const [saveError, setSaveError] = useState('')
@@ -79,6 +80,7 @@ export function App() {
         syncedDone.current = doneSet
         setTaskIds(p.tasks.map(t => t.id))
         setDiagram(p.diagram ?? '')
+        setSeqDiagram(p.sequenceDiagram ?? '')
         setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
       } catch { /* api unreachable — keep reviewing locally */ }
     }, 3000)
@@ -120,6 +122,7 @@ export function App() {
       let j = 0
       setTaskIds(tasks.map(t => (t.errors.length ? undefined : p.tasks[j++]?.id)))
       setDiagram(p.diagram ?? '')
+      setSeqDiagram(p.sequenceDiagram ?? '')
       syncedDone.current = new Set(done)
       serverMd.current = planToMarkdown(title, p.tasks)
       setProjectId(p.id)
@@ -140,6 +143,7 @@ export function App() {
       setCreated([])
       setTaskIds(p.tasks.map(t => t.id))
       setDiagram(p.diagram ?? '')
+      setSeqDiagram(p.sequenceDiagram ?? '')
       setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
       syncedDone.current = doneSet
       serverMd.current = fresh
@@ -166,7 +170,7 @@ export function App() {
   function newPlan() {
     setMd(''); setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([])
-    setDiagram(''); setTaskNodes([])
+    setDiagram(''); setSeqDiagram(''); setTaskNodes([])
     syncedDone.current = new Set(); serverMd.current = ''
     setSaveError('')
     setStep('input')
@@ -176,7 +180,7 @@ export function App() {
     setMd(value)
     setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([]); syncedDone.current = new Set()
-    setDiagram(''); setTaskNodes([]) // edited markdown is a new plan — old diagram no longer matches task indexes
+    setDiagram(''); setSeqDiagram(''); setTaskNodes([]) // edited markdown is a new plan — old diagram no longer matches task indexes
   }
 
   function startReview() {
@@ -230,6 +234,7 @@ export function App() {
           onBack={() => setStep(cameFrom)}
           onShip={() => setStep('create')}
           diagram={diagram}
+          seqDiagram={seqDiagram}
           taskNodes={taskNodes}
         />
       ) : (
