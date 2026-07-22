@@ -235,7 +235,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                 {isTop && (
                   <>
                     <span className="stamp" style={{ left: 20, color: 'var(--sec-outcome)', borderColor: 'var(--sec-outcome)', transform: 'rotate(-14deg)', opacity: Math.min(Math.max(dx, 0) / THROW, 1) }}>
-                      ✓ DONE
+                      ✓ APPROVE
                     </span>
                     <span className="stamp" style={{ right: 20, color: 'var(--sec-problem)', borderColor: 'var(--sec-problem)', transform: 'rotate(14deg)', opacity: Math.min(Math.max(-dx, 0) / THROW, 1) }}>
                       SKIP
