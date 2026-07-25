@@ -1,5 +1,5 @@
 import { LinearClient, LinearDocument } from '@linear/sdk'
-import { taskToDescription, type Task } from '../../../../shared/parse.ts'
+import { resolveDepIndex, taskToDescription, type Task } from '../../../../shared/parse.ts'
 import { ServiceUnavailableError } from '../errors.ts'
 
 export function makeLinearService(apiKey: string) {
@@ -18,19 +18,20 @@ export function makeLinearService(apiKey: string) {
     async createIssues(teamId: string, tasks: Task[]) {
       const client = requireClient()
       const created: { title: string; url: string }[] = []
-      const idByTitle = new Map<string, string>()
+      // parallel to `tasks`, so a dep resolves to an issue id via its task index
+      const issueIds: (string | undefined)[] = []
       for (const t of tasks) {
         const payload = await client.createIssue({ teamId, title: t.title, description: taskToDescription(t) })
         const issue = await payload.issue
         created.push({ title: t.title, url: issue?.url ?? '' })
-        if (issue) idByTitle.set(t.title.toLowerCase(), issue.id)
+        issueIds.push(issue?.id)
       }
 
       const relationErrors: string[] = []
-      for (const t of tasks) {
-        const blockedId = idByTitle.get(t.title.toLowerCase())
+      for (const [i, t] of tasks.entries()) {
+        const blockedId = issueIds[i]
         for (const dep of t.dependsOn ?? []) {
-          const blockerId = idByTitle.get(dep.title.toLowerCase())
+          const blockerId = issueIds[resolveDepIndex(tasks, dep.title)]
           if (!blockerId || !blockedId) continue
           try {
             await client.createIssueRelation({ issueId: blockerId, relatedIssueId: blockedId, type: LinearDocument.IssueRelationType.Blocks })

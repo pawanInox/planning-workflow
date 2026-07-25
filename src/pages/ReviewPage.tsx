@@ -1,5 +1,6 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
-import type { Task } from '../../shared/parse'
+import { Fragment, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { resolveDepIndex, type Task } from '../../shared/parse'
+import { groupTasks } from '../../shared/groups'
 import { TaskCard } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -22,10 +23,39 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
 }) {
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
+  // task indices whose detail is open — empty means the list opens as scannable name rows,
+  // and it is a set (not one index) so opening a task never closes another
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
   // which diagram to render when the project has both; fall back to whichever exists
   const [diagramKind, setDiagramKind] = useState<'flow' | 'seq'>('flow')
   const shownDiagram = diagramKind === 'seq' && seqDiagram ? seqDiagram : diagram || seqDiagram
   const active = view === 'focus' ? focusTop : selected
+  // independent tracks: no track depends on a task in another, so each can be handed off separately
+  const tracks = useMemo(() => groupTasks(tasks), [tasks])
+  const renderTask = (i: number) => (
+    <TaskCard
+      key={i}
+      task={tasks[i]}
+      index={i}
+      checked={done.has(i)}
+      resolveDep={dep => {
+        const di = resolveDepIndex(tasks, dep)
+        return di === -1 ? null : { done: done.has(di) }
+      }}
+      onToggle={() => setDone(prev => {
+        const next = new Set(prev)
+        next.has(i) ? next.delete(i) : next.add(i)
+        return next
+      })}
+      onSelect={shownDiagram ? () => setSelected(i) : undefined}
+      collapsed={!expanded.has(i)}
+      onToggleExpand={() => setExpanded(prev => {
+        const next = new Set(prev)
+        next.has(i) ? next.delete(i) : next.add(i)
+        return next
+      })}
+    />
+  )
   const body = view === 'focus' ? (
     <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
   ) : (<>
@@ -37,24 +67,26 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         <div className="progress-fill" style={{ width: `${(done.size / tasks.length) * 100}%` }} />
       </div>
     </div>
-    {tasks.map((t, i) => (
-      <TaskCard
-        key={i}
-        task={t}
-        index={i}
-        checked={done.has(i)}
-        resolveDep={dep => {
-          const di = tasks.findIndex(x => x.title.toLowerCase() === dep.toLowerCase())
-          return di === -1 ? null : { done: done.has(di) }
-        }}
-        onToggle={() => setDone(prev => {
-          const next = new Set(prev)
-          next.has(i) ? next.delete(i) : next.add(i)
-          return next
-        })}
-        onSelect={shownDiagram ? () => setSelected(i) : undefined}
-      />
-    ))}
+    {tracks.map((track, ti) => {
+      const doneInTrack = track.filter(i => done.has(i)).length
+      return (
+        // headers are siblings in the page's flex column, so a single track renders
+        // exactly the flat list it used to — no wrapper, no extra spacing
+        // keyed by the track's lowest task index (unique, and stable across polls)
+        <Fragment key={track[0]}>
+          {tracks.length > 1 ? (<>
+            {/* the track name is the tree's root; its tasks hang off the rail below it */}
+            <div className="track-label" style={{ marginTop: ti > 0 ? 12 : 0 }}>
+              <span className="eyebrow">Track {ti + 1}</span>
+              <span className="track-count">{doneInTrack}/{track.length} done</span>
+            </div>
+            <div className="tree">
+              {track.map(i => <div key={i} className="tree-row">{renderTask(i)}</div>)}
+            </div>
+          </>) : track.map(renderTask)}
+        </Fragment>
+      )
+    })}
   </>)
   return (
     <div style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>

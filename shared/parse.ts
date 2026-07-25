@@ -10,6 +10,10 @@ export type Task = {
   warnings: string[]
 }
 
+/** Index of the task a `dependsOn` entry names (case-insensitive), or -1 if the plan has no such task. */
+export const resolveDepIndex = (tasks: Pick<Task, 'title'>[], depTitle: string): number =>
+  tasks.findIndex(t => t.title.toLowerCase() === depTitle.toLowerCase())
+
 const SECTIONS: Record<string, 'problem' | 'todo' | 'outcome' | 'deps'> = {
   'problem': 'problem',
   'what to do': 'todo',
@@ -52,7 +56,6 @@ export function parsePlan(md: string): { planTitle: string; tasks: Task[] } {
     }
   }
 
-  const titles = new Set(tasks.map(t => t.title.toLowerCase()))
   for (const t of tasks) {
     t.problem = t.problem.trim()
     t.todo = t.todo.trim()
@@ -61,7 +64,7 @@ export function parsePlan(md: string): { planTitle: string; tasks: Task[] } {
     if (!t.todo) t.errors.push('missing "### What to do"')
     if (!t.outcome) t.errors.push('missing "### Expected outcome"')
     for (const dep of t.dependsOn) {
-      if (!titles.has(dep.title.toLowerCase())) t.warnings.push(`unknown dependency "${dep.title}"`)
+      if (resolveDepIndex(tasks, dep.title) === -1) t.warnings.push(`unknown dependency "${dep.title}"`)
     }
   }
 

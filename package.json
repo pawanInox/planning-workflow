@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,api \"vite\" \"tsx watch server/index.ts\"",
-    "test": "tsx --test shared/parse.test.ts server/src/services/projects/projects.service.test.ts server/src/schemas/projects.schema.test.ts",
+    "test": "tsx --test shared/parse.test.ts shared/groups.test.ts server/src/services/projects/projects.service.test.ts server/src/schemas/projects.schema.test.ts",
     "build": "vite build"
   },
   "dependencies": {

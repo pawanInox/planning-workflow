@@ -4,7 +4,7 @@ Paste a markdown plan → review tasks card-by-card (Focus deck or List) → shi
 
 - Frontend: React + Vite (`src/`), dev server on 5173, proxies `/api` to the API. Follow the `vite-react-best-practices` skill (`.agents/skills/`). In this repo that means: pages in `src/pages/` (lazy-loaded), shared UI in `src/components/`, ALL server calls in `src/lib/api.ts` (no raw `fetch` in components). Deliberate deviation: no React Query/SWR — plain fetch wrappers in `lib/api.ts` until caching/retries matter.
 - API: Express (`server/`), port 3001 (`PORT` env). Follow the `express-typescript-api-best-practices` skill (`.agents/skills/`). In this repo: `v1/routes → controllers → services → repositories → models` under `server/src/`, Zod schemas in `schemas/` applied via the `validate` middleware, central `error-handler`, envelope responses (below); `server/index.ts` is the composition root. Deliberate deviations: no Swagger (this file is the API doc), no JWT/auth (single-user tool), no Mongo transactions (standalone Mongo doesn't support them).
-- Shared parser/serializer: `shared/parse.ts` (`parsePlan` ⇄ `planToMarkdown`).
+- Shared parser/serializer: `shared/parse.ts` (`parsePlan` ⇄ `planToMarkdown`). Also in `shared/`: `groups.ts` (`groupTasks` — splits tasks into independent tracks, the connected components of the `dependsOn` graph, so no track depends on another).
 - Run: `npm run dev` (needs `MONGODB_URI` in `.env` for persistence) or `docker compose up --build` (app on 5173, Mongo browsable on 27019).
 - Test: `npm test` (node:test via tsx). Typecheck: `npx tsc --noEmit`.
 

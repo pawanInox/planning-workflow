@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Task } from '../../shared/parse'
+import { resolveDepIndex, type Task } from '../../shared/parse'
 import { api } from '../lib/api'
 import { Section, DepChips, CopyPromptButton, cardHue, taskIcon, taskMemeQuery } from './TaskCard'
 
@@ -258,7 +258,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                 <DepChips
                   task={t}
                   resolved={dep => {
-                    const di = tasks.findIndex(x => x.title.toLowerCase() === dep.toLowerCase())
+                    const di = resolveDepIndex(tasks, dep)
                     return di === -1 ? null : { done: done.has(di), onClick: () => jumpTo(di) }
                   }}
                 />

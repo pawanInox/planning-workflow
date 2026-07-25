@@ -130,10 +130,26 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
           if (!isFlowchart && ids.length) highlightActors(ref.current, source, ids)
           applyZoom()
           setError('')
+          sessionStorage.removeItem('diagram-chunk-reloaded') // chunks load fine again; re-arm the one-shot reload
         }
       } catch (e: any) {
         document.getElementById(`diagram-${n}`)?.remove() // mermaid leaves a temp element behind on parse errors
-        if (seq.current === n) setError(String(e?.message ?? e))
+        const msg = String(e?.message ?? e)
+        // Mermaid loads each diagram type as its own lazy chunk, so a tab left open across a
+        // redeploy asks for a hashed file that no longer exists. That is a stale page, not a
+        // bad diagram — reload once to pick up the new build. The flag stops a reload loop if
+        // the fetch is failing for any other reason.
+        if (/Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(msg)) {
+          if (!sessionStorage.getItem('diagram-chunk-reloaded')) {
+            sessionStorage.setItem('diagram-chunk-reloaded', '1')
+            location.reload()
+            return
+          }
+          if (seq.current === n) setError('the app was updated in the background — reload the page to view this diagram')
+          return
+        }
+        sessionStorage.removeItem('diagram-chunk-reloaded') // a render got far enough to fail for a real reason
+        if (seq.current === n) setError(msg)
       }
     })
   }, [src, ids.join(',')]) // ids matter on their own for sequence diagrams, where src never embeds them

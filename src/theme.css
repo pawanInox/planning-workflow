@@ -340,10 +340,95 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   50% { transform: translateY(-10px); }
 }
 
+/* a collapsed task card is one big hit target — lift the shadow so it reads as clickable.
+   (border-color is set inline on the card, so CSS cannot win there; the shadow can.) */
+.card[data-clickable]:hover {
+  box-shadow: 7px 7px 0 var(--shadow-color);
+}
+
+/* The name row toggles on click, so a quick second click (open, then close again) would
+   otherwise land as a double-click and select the title. Only the row is locked — the
+   task body stays selectable, because copying a file path out of it is the point. */
+[data-task-header] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---- review tree -------------------------------------------------------------
+   The track name is the root and its tasks hang off one rail, ├ for each and └ for
+   the last, so a track reads as a single branch of work rather than loose cards.
+   Rails are as thick as the card borders — a hairline would read as a different app. */
+.tree {
+  --rail: 26px;
+  --elbow-y: 34px; /* the card's title line: 3px border + 18px padding + half the icon chip */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: var(--rail);
+}
+
+.tree-row { position: relative; }
+
+/* the rail: runs down through this row and the gap above it, joining task to task */
+.tree-row::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--rail) * -1);
+  top: -12px;
+  bottom: -12px;
+  border-left: 3px solid var(--border);
+  pointer-events: none;
+}
+
+/* the last task closes the branch — the rail stops at its elbow instead of running on */
+.tree-row:last-child::before {
+  bottom: auto;
+  height: calc(var(--elbow-y) + 12px);
+}
+
+/* the elbow into each card, landing on the title line */
+.tree-row::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--rail) * -1);
+  top: var(--elbow-y);
+  width: var(--rail);
+  border-top: 3px solid var(--border);
+  pointer-events: none;
+}
+
+.track-label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.track-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  /* a phone column cannot spare the full gutter — keep the shape, shorten the reach */
+  .tree { --rail: 14px; }
+}
+
+/* expand/collapse chevron on a task's name row: ▸ collapsed, rotated to ▾ when open */
+.caret {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  transition: transform 0.18s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reel { scroll-behavior: auto; }
   .pop, .bounce { animation: none; }
   .progress-fill { transition: none; }
+  .caret { transition: none; }
 }
 
 .review-split {
