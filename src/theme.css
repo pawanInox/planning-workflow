@@ -300,6 +300,9 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
 @media (prefers-reduced-motion: reduce) {
   .meme-skel, .bounce { animation: none; }
   .progress-fill, .caret { transition: none; }
+  /* open/close still WORK here, they just snap — the closed rule keeps its 0fr and visibility,
+     so dropping the transition must not also drop the state that hides the detail */
+  .task-detail, .task-detail[data-closed] { transition: none; }
 }
 
 .stamp {
@@ -418,23 +421,60 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
-  transition: transform 0.18s ease;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* A task's detail glides open and closed on grid-template-rows, which resolves to the real content
+   height — no JS measurement, no hardcoded max-height. A TRANSITION (not an animation) is what
+   makes closing animate too: the wrapper stays mounted, so there is something to animate back.
+   The tree rail is anchored to the row, so the branch grows and retracts with the card. */
+.task-detail {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.task-detail > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.task-detail[data-closed] {
+  grid-template-rows: 0fr;
+  /* keeps the closed detail out of the accessibility tree and the tab order, and is delayed by the
+     full duration so it applies only once the row has finished retracting */
+  visibility: hidden;
+  transition: grid-template-rows 240ms cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 240ms;
 }
 
 
+/* the review shell claims exactly one viewport; the split fills what the header leaves */
+.review-shell { height: 100vh; }
+
+/* The split owns the viewport and each column scrolls itself, rather than the page scrolling and
+   the diagram trying to stay put with `position: sticky`. Sticky was bottom-constrained by the
+   grid row, so growing the task list — expanding a task — changed how far the diagram could
+   travel and slid it mid-animation. With no page scroll there is nothing for it to drift against. */
 .review-split {
   display: grid;
   grid-template-columns: minmax(320px, 520px) minmax(0, 760px);
   gap: 24px;
   justify-content: center;
+  /* fills whatever the header leaves, so no magic offset to keep in sync with the header height */
+  flex: 1;
+  min-height: 0;
 }
 .review-split > .diagram-col {
-  position: sticky;
-  top: 66px; /* clears the sticky review header (~65px tall) */
-  height: calc(100vh - 78px); /* definite height so the inner card gets a bounded box to scroll within */
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden; /* the card scrolls internally — the column stays put so the toggle/zoom chrome doesn't move */
+}
+/* the task list is the one that scrolls now */
+.review-split > .task-col {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding-bottom: 24px; /* the page's bottom padding used to do this */
 }
 /* diagram-type toggle stays fixed at the top of the column while the diagram scrolls */
 .diagram-col > .diagram-toggle { flex-shrink: 0; }
@@ -456,7 +496,10 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
 }
 .diagram-col svg { max-width: 100%; height: auto; }
 @media (max-width: 1023px) {
-  .review-split { grid-template-columns: minmax(0, 1fr); }
-  .review-split > .diagram-col { position: static; height: auto; overflow: visible; }
+  /* stacked: hand scrolling back to the page, since there is no side-by-side to hold still */
+  .review-shell { height: auto; }
+  .review-split { grid-template-columns: minmax(0, 1fr); flex: none; }
+  .review-split > .diagram-col { height: auto; overflow: visible; }
+  .review-split > .task-col { overflow-y: visible; padding-bottom: 0; }
   .diagram-col > .dpanel { min-height: auto; }
 }

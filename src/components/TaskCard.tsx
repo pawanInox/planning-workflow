@@ -205,6 +205,11 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
   // this task gets SKIPPED at ship time, which a list you are scanning must not hide. Dependency
   // warnings (in DepChips) do stay hidden until expanded — they block nothing, so they can wait.
   const hasError = task.errors.length > 0
+  const errorLine = (
+    <p style={{ fontSize: 13, color: 'var(--warn)', margin: 0 }}>
+      ⚠ {task.errors.join(', ')} — this task will be skipped.
+    </p>
+  )
   return (
     <div
       className="card"
@@ -252,12 +257,18 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
           </span>
         </span>
       </div>
-      {!collapsed && <DepChips task={task} resolved={resolveDep} />}
-      {hasError ? (
-        <p style={{ fontSize: 13, color: 'var(--warn)', margin: 0 }}>
-          ⚠ {task.errors.join(', ')} — this task will be skipped.
-        </p>
-      ) : !collapsed && <TaskSections task={task} />}
+      {/* errors stay outside the collapsing wrapper — they read in both states, because a task
+          that will be SKIPPED at ship time must announce itself in a list you are scanning */}
+      {hasError && errorLine}
+      {/* Always mounted, and closed via an attribute rather than by unmounting: a transition needs
+          both ends to exist, so conditional rendering is exactly what made collapsing un-animatable.
+          Its single child is what the row height resolves to. */}
+      <div className="task-detail" data-closed={collapsed || undefined}>
+        <div>
+          <DepChips task={task} resolved={resolveDep} />
+          {!hasError && <TaskSections task={task} />}
+        </div>
+      </div>
     </div>
   )
 }

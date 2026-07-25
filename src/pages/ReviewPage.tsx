@@ -82,7 +82,10 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
     ))}
   </>)
   return (
-    <div style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      className={shownDiagram ? 'review-shell' : undefined}
+      style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}
+    >
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -121,7 +124,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
             )}
             <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          <div className="task-col" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             {body}
           </div>
         </div>
