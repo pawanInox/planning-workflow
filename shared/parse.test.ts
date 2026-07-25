@@ -85,6 +85,56 @@ test('planToMarkdown round-trips through parsePlan', () => {
   assert.ok(parsed.every(t => t.errors.length === 0 && t.warnings.length === 0))
 })
 
+// These four all round-tripped LOSSILY before: the app re-serializes saved projects back through
+// parsePlan, so anything that does not survive is real data loss out of the database.
+test('a body line that looks like a task heading does not fork a phantom task', () => {
+  const tasks = [
+    { title: 'A', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [] },
+    { title: 'B', problem: 'the format is:\n## Task: sample', todo: 'd', outcome: 'o', dependsOn: [] },
+    { title: 'C', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [] },
+  ]
+  const parsed = parsePlan(planToMarkdown('P', tasks)).tasks
+  // a 4th "sample" task here would shift every index-keyed done flag and task id after it
+  assert.deepEqual(parsed.map(t => t.title), ['A', 'B', 'C'])
+  assert.equal(parsed[1].problem, 'the format is:\n## Task: sample')
+})
+
+test('an unrecognised ### heading in a body is kept as prose, not dropped', () => {
+  const tasks = [{ title: 'X', problem: 'p', todo: 'step 1\n### Notes\nstep 2', outcome: 'o', dependsOn: [] }]
+  const parsed = parsePlan(planToMarkdown('P', tasks)).tasks[0]
+  assert.equal(parsed.todo, 'step 1\n### Notes\nstep 2')
+})
+
+test('a section heading inside a body does not leak into another section', () => {
+  const tasks = [{ title: 'X', problem: 'p', todo: 'd', outcome: 'o1\n### Problem\nnot a real heading', dependsOn: [] }]
+  const parsed = parsePlan(planToMarkdown('P', tasks)).tasks[0]
+  assert.equal(parsed.problem, 'p')
+  assert.equal(parsed.outcome, 'o1\n### Problem\nnot a real heading')
+})
+
+test('a dependency title containing the reason separator survives', () => {
+  const tasks = [
+    { title: 'add --verbose — the long form', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [] },
+    { title: 'uses it', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [{ title: 'add --verbose — the long form', reason: 'nothing to call' }] },
+  ]
+  const parsed = parsePlan(planToMarkdown('P', tasks)).tasks
+  assert.deepEqual(parsed[1].dependsOn, [{ title: 'add --verbose — the long form', reason: 'nothing to call' }])
+  // a mangled title resolves to nothing, which silently drops the blocking edge
+  assert.deepEqual(parsed[1].warnings, [])
+})
+
+test('a repeated task title is warned about on both the task and its dependents', () => {
+  const md = planToMarkdown('P', [
+    { title: 'a', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [] },
+    { title: 'a', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [] },
+    { title: 'c', problem: 'p', todo: 'd', outcome: 'o', dependsOn: [{ title: 'a', reason: 'r' }] },
+  ])
+  const parsed = parsePlan(md).tasks
+  assert.ok(parsed[0].warnings.some(w => w.includes('duplicate task title')))
+  assert.ok(parsed[1].warnings.some(w => w.includes('duplicate task title')))
+  assert.ok(parsed[2].warnings.some(w => w.includes('ambiguous dependency')))
+})
+
 test('parses depends on with reasons and title validation', () => {
   const { tasks } = parsePlan(depPlan)
   assert.deepEqual(tasks[0].dependsOn, [])

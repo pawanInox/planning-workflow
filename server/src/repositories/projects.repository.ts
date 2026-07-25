@@ -10,10 +10,17 @@ export class MongooseProjectRepository implements ProjectRepository {
       ...(diagram !== undefined ? { diagram } : {}),
       ...(sequenceDiagram !== undefined ? { sequenceDiagram } : {}),
     })
-    const docs = tasks.length
-      ? await TaskModel.insertMany(tasks.map((t, i) => ({ ...t, projectId: p._id, order: i })))
-      : []
-    return { ...toProject(p), tasks: docs.map(toTask) }
+    // no transactions on standalone Mongo, so compensate by hand: a failed task insert must not
+    // leave a permanently empty project sitting in the list
+    try {
+      const docs = tasks.length
+        ? await TaskModel.insertMany(tasks.map((t, i) => ({ ...t, projectId: p._id, order: i })))
+        : []
+      return { ...toProject(p), tasks: docs.map(toTask) }
+    } catch (e) {
+      await ProjectModel.findByIdAndDelete(p._id).catch(() => {})
+      throw e
+    }
   }
 
   // ponytail: N+1 count queries per project, switch to one aggregate if lists grow
@@ -46,8 +53,17 @@ export class MongooseProjectRepository implements ProjectRepository {
     const p = await ProjectModel.findByIdAndUpdate(_id, patch, { new: true })
     if (!p) return null
     if (tasks !== undefined) {
+      // Replacing tasks is delete-then-insert with no transaction available, so keep the old
+      // documents in hand and put them back if the insert fails. Otherwise a Mongo blip between
+      // the two steps destroys the entire plan, unrecoverably.
+      const previous = await TaskModel.find({ projectId: _id }).sort({ order: 1 }).lean()
       await TaskModel.deleteMany({ projectId: _id })
-      if (tasks.length) await TaskModel.insertMany(tasks.map((t, i) => ({ ...t, projectId: _id, order: i })))
+      try {
+        if (tasks.length) await TaskModel.insertMany(tasks.map((t, i) => ({ ...t, projectId: _id, order: i })))
+      } catch (e) {
+        await TaskModel.insertMany(previous.map(({ _id: _drop, ...t }) => t)).catch(() => {})
+        throw e
+      }
     }
     return this.getById(id)
   }
@@ -55,9 +71,12 @@ export class MongooseProjectRepository implements ProjectRepository {
   async delete(id: string): Promise<boolean> {
     const _id = oid(id)
     if (!_id) return false
-    const removed = await ProjectModel.findByIdAndDelete(_id)
-    if (!removed) return false
+    const exists = await ProjectModel.findById(_id).select('_id').lean()
+    if (!exists) return false
+    // tasks first: if this fails the project survives, so the delete is visible and retryable.
+    // The other order orphans tasks with no owning project to ever reach them again.
     await TaskModel.deleteMany({ projectId: _id })
+    await ProjectModel.findByIdAndDelete(_id)
     return true
   }
 }

@@ -296,8 +296,10 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+/* every motion opt-out lives here — one block, so nothing gets missed */
 @media (prefers-reduced-motion: reduce) {
-  .meme-skel { animation: none; }
+  .meme-skel, .bounce { animation: none; }
+  .progress-fill, .caret { transition: none; }
 }
 
 .stamp {
@@ -328,12 +330,6 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   user-select: none;
 }
 
-.pop { animation: pop 0.35s cubic-bezier(0.22, 1.6, 0.36, 1); }
-@keyframes pop {
-  0% { transform: scale(0.6); }
-  100% { transform: scale(1); }
-}
-
 .bounce { animation: bounce 1.2s ease infinite; }
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
@@ -342,6 +338,7 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
 
 /* a collapsed task card is one big hit target — lift the shadow so it reads as clickable.
    (border-color is set inline on the card, so CSS cannot win there; the shadow can.) */
+.card[data-clickable] { cursor: pointer; }
 .card[data-clickable]:hover {
   box-shadow: 7px 7px 0 var(--shadow-color);
 }
@@ -424,12 +421,6 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   transition: transform 0.18s ease;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .reel { scroll-behavior: auto; }
-  .pop, .bounce { animation: none; }
-  .progress-fill { transition: none; }
-  .caret { transition: none; }
-}
 
 .review-split {
   display: grid;

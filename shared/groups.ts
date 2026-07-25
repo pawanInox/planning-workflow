@@ -1,4 +1,4 @@
-import { resolveDepIndex, type Task } from './parse.ts'
+import { resolveDepIndexes, type Task } from './parse.ts'
 
 /**
  * Split tasks into independent tracks — the connected components of the
@@ -17,12 +17,15 @@ export function groupTasks(tasks: Pick<Task, 'title' | 'dependsOn'>[]): number[]
   const neighbours: number[][] = tasks.map(() => [])
   tasks.forEach((task, i) => {
     for (const dep of task.dependsOn) {
-      const target = resolveDepIndex(tasks, dep.title)
-      // a dependency naming no task in this plan (parse.ts already warns about
-      // those) has nothing to link to
-      if (target === -1) continue
-      neighbours[i].push(target)
-      neighbours[target].push(i)
+      // EVERY task with that title, not just the first: if a plan repeats a title the dependency
+      // is ambiguous, and linking only one would leave a real prerequisite in another track —
+      // breaking the one guarantee this function exists to provide. A dependency naming no task
+      // at all (parse.ts warns about those) links nothing.
+      for (const target of resolveDepIndexes(tasks, dep.title)) {
+        if (target === i) continue
+        neighbours[i].push(target)
+        neighbours[target].push(i)
+      }
     }
   })
 

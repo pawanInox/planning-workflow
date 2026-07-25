@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { taskToPrompt, taskToReviewPrompt } from '../../shared/parse'
 import type { Task } from '../../shared/parse'
 
@@ -167,74 +167,78 @@ export function Section({ name, text, tone, large = false }: { name: string; tex
   )
 }
 
-export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect, collapsed = false, onToggleExpand }: {
+// The Focus deck re-renders on every pointermove while a card is being dragged, and each
+// Section re-splits its text and runs three regexes per line. Memoising on the task keeps that
+// work from repeating 60+ times a second for cards whose prose has not changed.
+export const TaskSections = memo(function TaskSections({ task, large = false }: { task: Task; large?: boolean }) {
+  return (<>
+    <Section name="Problem" text={task.problem} tone="problem" large={large} />
+    <Section name="What to do" text={task.todo} tone="action" large={large} />
+    <Section name="Expected outcome" text={task.outcome} tone="outcome" large={large} />
+  </>)
+})
+
+export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect, collapsed, onToggleExpand }: {
   task: Task
   index: number
   checked?: boolean
   onToggle?: () => void
   resolveDep?: (title: string) => { done: boolean } | null
   onSelect?: () => void
-  collapsed?: boolean
-  onToggleExpand?: () => void
+  collapsed: boolean
+  onToggleExpand: () => void
 }) {
   const hue = cardHue(index)
   // one click both reveals the detail and points the diagram at this task
-  const onTitleClick = onToggleExpand || onSelect
-    ? () => { onToggleExpand?.(); onSelect?.() }
-    : undefined
-  const titleHint = onToggleExpand
-    ? (collapsed ? 'Show detail and highlight in the diagram' : 'Hide detail')
-    : onSelect ? 'Show this task in the diagram' : undefined
+  const onTitleClick = () => { onToggleExpand(); onSelect?.() }
+  const titleHint = collapsed ? 'Show detail and highlight in the diagram' : 'Hide detail'
   // While collapsed the whole card is the hit target. Once open, only the header row closes
   // it again — the body has to stay selectable, since copying a file path out of "What to do"
   // is the main thing people do there, and a click-to-collapse body would fight that.
-  const onCardClick = onTitleClick && ((e: React.MouseEvent) => {
+  const onCardClick = (e: React.MouseEvent) => {
     const el = e.target as HTMLElement
-    if (el.closest('button, a, input, textarea, select')) return // controls keep their own clicks
+    if (el.closest('button, a')) return // the card holds no other controls; these keep their clicks
     if (!collapsed && !el.closest('[data-task-header]')) return
     onTitleClick()
-  })
+  }
   // the error line stands in for the sections, so it stays visible while collapsed: errors mean
   // this task gets SKIPPED at ship time, which a list you are scanning must not hide. Dependency
   // warnings (in DepChips) do stay hidden until expanded — they block nothing, so they can wait.
-  const showError = task.errors.length > 0
+  const hasError = task.errors.length > 0
   return (
     <div
       className="card"
-      data-clickable={onCardClick && collapsed ? '' : undefined}
+      data-clickable={collapsed ? '' : undefined}
       onClick={onCardClick}
       style={{
-        borderColor: task.errors.length ? 'var(--warn-border)' : 'var(--border)',
+        borderColor: hasError ? 'var(--warn-border)' : 'var(--border)',
         borderTop: `3px solid ${hue}`,
         opacity: checked ? 0.8 : undefined,
-        cursor: onCardClick && collapsed ? 'pointer' : undefined,
       }}
     >
       <div
         data-task-header=""
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: collapsed && !showError ? 0 : 10, gap: 8, cursor: onTitleClick ? 'pointer' : undefined }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: collapsed && !hasError ? 0 : 10, gap: 8, cursor: 'pointer' }}
       >
         {/* the accessible control stays on the title (a role=button wrapping the Approve
             button would be invalid nesting); the card click above is a mouse convenience */}
         <span
           style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}
           title={titleHint}
-          role={onTitleClick ? 'button' : undefined}
-          tabIndex={onTitleClick ? 0 : undefined}
-          aria-expanded={onToggleExpand ? !collapsed : undefined}
-          onKeyDown={onTitleClick && (e => {
+          role="button"
+          tabIndex={0}
+          aria-expanded={!collapsed}
+          onKeyDown={e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTitleClick() }
-          })}
+          }}
         >
-          {onToggleExpand && (
-            <span className="caret" aria-hidden="true" style={{ transform: collapsed ? 'none' : 'rotate(90deg)' }}>▸</span>
-          )}
+          <span className="caret" aria-hidden="true" style={{ transform: collapsed ? 'none' : 'rotate(90deg)' }}>▸</span>
           <span className="icon-chip" style={{ background: `color-mix(in srgb, ${hue} 14%, transparent)` }}>{taskIcon(task)}</span>
           <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>{task.title}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {!collapsed && <CopyPromptButton task={task} />}
-          {onToggle && task.errors.length === 0 && (
+          {onToggle && !hasError && (
             <button
               className={`btn-done${checked ? ' checked' : ''}`}
               style={{ height: 28, fontSize: 12, padding: '0 12px', whiteSpace: 'nowrap' }}
@@ -249,17 +253,11 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
         </span>
       </div>
       {!collapsed && <DepChips task={task} resolved={resolveDep} />}
-      {showError ? (
+      {hasError ? (
         <p style={{ fontSize: 13, color: 'var(--warn)', margin: 0 }}>
           ⚠ {task.errors.join(', ')} — this task will be skipped.
         </p>
-      ) : !collapsed && (
-        <>
-          <Section name="Problem" text={task.problem} tone="problem" />
-          <Section name="What to do" text={task.todo} tone="action" />
-          <Section name="Expected outcome" text={task.outcome} tone="outcome" />
-        </>
-      )}
+      ) : !collapsed && <TaskSections task={task} />}
     </div>
   )
 }

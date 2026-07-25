@@ -34,17 +34,18 @@ export const api = {
   getProject: (id: string): Promise<ProjectWithTasks> =>
     fetch(`${BASE}/projects/${id}`).then(r => unwrap<ProjectWithTasks>(r)),
 
-  createProject: (title: string, tasks: TaskPayload[], diagram?: string): Promise<ProjectWithTasks> =>
-    fetch(`${BASE}/projects`, send('POST', { title, tasks, ...(diagram ? { diagram } : {}) })).then(r => unwrap<ProjectWithTasks>(r)),
+  createProject: (title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
+    fetch(`${BASE}/projects`, send('POST', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
 
-  updateProject: (id: string, title: string, tasks: TaskPayload[], diagram?: string): Promise<ProjectWithTasks> =>
-    fetch(`${BASE}/projects/${id}`, send('PUT', { title, tasks, ...(diagram ? { diagram } : {}) })).then(r => unwrap<ProjectWithTasks>(r)),
+  updateProject: (id: string, title: string, tasks: TaskPayload[]): Promise<ProjectWithTasks> =>
+    fetch(`${BASE}/projects/${id}`, send('PUT', { title, tasks })).then(r => unwrap<ProjectWithTasks>(r)),
 
   deleteProject: (id: string): Promise<void> =>
     fetch(`${BASE}/projects/${id}`, { method: 'DELETE' }).then(r => unwrap<void>(r)),
 
-  setTaskDone: (projectId: string, taskId: string, done: boolean): Promise<Response> =>
-    fetch(`${BASE}/projects/${projectId}/tasks/${taskId}`, send('PATCH', { done })),
+  // throws like every other method, so no caller has to know about HTTP status codes
+  setTaskDone: (projectId: string, taskId: string, done: boolean): Promise<void> =>
+    fetch(`${BASE}/projects/${projectId}/tasks/${taskId}`, send('PATCH', { done })).then(r => unwrap<void>(r)),
 
   getMeme: (query: string): Promise<Meme> =>
     fetch(`${BASE}/memes?q=${encodeURIComponent(query)}`).then(r => unwrap<Meme>(r)),

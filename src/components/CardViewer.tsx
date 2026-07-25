@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { ReactNode } from 'react'
 import { resolveDepIndex, type Task } from '../../shared/parse'
 import { api } from '../lib/api'
-import { Section, DepChips, CopyPromptButton, cardHue, taskIcon, taskMemeQuery } from './TaskCard'
+import { TaskSections, DepChips, CopyPromptButton, cardHue, taskIcon, taskMemeQuery } from './TaskCard'
 
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -38,7 +38,7 @@ function Meme({ query, fallback }: { query: string; fallback?: ReactNode }) {
 export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   tasks: Task[]
   done: Set<number>
-  setDone: (d: Set<number>) => void
+  setDone: Dispatch<SetStateAction<Set<number>>>
   onShip: () => void
   onTopChange?: (index: number | null) => void
 }) {
@@ -50,6 +50,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   const [leaving, setLeaving] = useState<Dir | null>(null)
   const [entering, setEntering] = useState<Dir | null>(null)
   const start = useRef<{ x: number; y: number; swiping: boolean } | null>(null)
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     if (!entering) return
@@ -58,9 +59,13 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   }, [entering])
 
   useEffect(() => {
+    clearTimeout(commitTimer.current) // a pending commit belongs to the old task list
     setQueue(tasks.map((_, i) => i).filter(i => !done.has(i)))
     setSkipped(new Set()); setHistory([]); setDx(0); setLeaving(null)
+    setDragging(false); start.current = null
   }, [tasks])
+
+  useEffect(() => () => clearTimeout(commitTimer.current), [])
 
   const top = queue[0]
 
@@ -69,10 +74,10 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   function commit(dir: Dir) {
     if (top === undefined || leaving) return
     setLeaving(dir)
-    if (dir === 'right') setDone(new Set(done).add(top))
+    if (dir === 'right') setDone(prev => new Set(prev).add(top))
     else setSkipped(s => new Set(s).add(top))
     setHistory(h => [...h, { index: top, dir }])
-    setTimeout(() => {
+    commitTimer.current = setTimeout(() => {
       setQueue(q => q.slice(1))
       setDx(0); setLeaving(null)
     }, 280)
@@ -82,7 +87,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
     if (history.length === 0 || leaving) return
     const last = history[history.length - 1]
     setHistory(h => h.slice(0, -1))
-    const d = new Set(done); d.delete(last.index); setDone(d)
+    setDone(prev => { const d = new Set(prev); d.delete(last.index); return d })
     setSkipped(s => { const n = new Set(s); n.delete(last.index); return n })
     setQueue(q => [last.index, ...q])
     if (!reducedMotion()) setEntering(last.dir)
@@ -91,7 +96,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
   function jumpTo(i: number) {
     if (i === top || leaving) return
     const swipedDir = history.find(x => x.index === i)?.dir
-    const d = new Set(done); d.delete(i); setDone(d)
+    setDone(prev => { const d = new Set(prev); d.delete(i); return d })
     setSkipped(s => { const n = new Set(s); n.delete(i); return n })
     setHistory(h => h.filter(x => x.index !== i))
     setQueue(q => [i, ...q.filter(x => x !== i)])
@@ -267,11 +272,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                     ⚠ {t.errors.join(', ')} — this task will be skipped on create.
                   </p>
                 ) : (
-                  <>
-                    <Section name="Problem" text={t.problem} tone="problem" large />
-                    <Section name="What to do" text={t.todo} tone="action" large />
-                    <Section name="Expected outcome" text={t.outcome} tone="outcome" large />
-                  </>
+                  <TaskSections task={t} large />
                 )}
                 {isTop && (
                   <div style={{ marginTop: 'auto', paddingTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

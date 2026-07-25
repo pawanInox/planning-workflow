@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { parsePlan, planToMarkdown } from '../shared/parse'
-import { api, type CreatedIssue, type ProjectSummary, type Team } from './lib/api'
+import { api, type CreatedIssue, type ProjectSummary, type ProjectWithTasks, type Team } from './lib/api'
 
 // route-level code splitting (React.lazy + Suspense) while keeping named exports
 const InputPage = lazy(() => import('./pages/InputPage').then(m => ({ default: m.InputPage })))
@@ -19,6 +19,7 @@ export function App() {
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<CreatedIssue[]>([])
   const [error, setError] = useState('')
+  const [openError, setOpenError] = useState('')
   const [projectId, setProjectId] = useState<string | null>(null)
   const [taskIds, setTaskIds] = useState<(string | undefined)[]>([])
   const [diagram, setDiagram] = useState('')
@@ -29,17 +30,37 @@ export function App() {
   const [listError, setListError] = useState('')
   const saving = useRef(false)
   const syncedDone = useRef<Set<number>>(new Set())
+  const deepLinkPending = useRef(new URLSearchParams(window.location.search).has('project'))
   const serverMd = useRef('') // serialized server state; poll re-hydrates only when it changes
 
   const { planTitle, tasks } = useMemo(() => parsePlan(md), [md])
   const shippable = [...done].sort((a, b) => a - b).map(i => tasks[i]).filter(t => t && t.errors.length === 0)
 
+  // the one place that maps a saved project onto state — used by both the initial open and the
+  // poll, so a newly persisted field can never load in one path and be forgotten in the other
+  function hydrate(p: ProjectWithTasks) {
+    const doneSet = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
+    const fresh = planToMarkdown(p.title, p.tasks)
+    setMd(fresh)
+    setDone(doneSet)
+    setTaskIds(p.tasks.map(t => t.id))
+    setDiagram(p.diagram ?? '')
+    setSeqDiagram(p.sequenceDiagram ?? '')
+    setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
+    setProjectId(p.id)
+    syncedDone.current = doneSet
+    serverMd.current = fresh
+  }
+
   // deep link: /?project=<id> opens that project straight into review, /?page=projects opens the list
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const pid = params.get('project')
-    if (pid) openProject(pid)
-    else if (params.get('page') === 'projects') setStep('projects')
+    if (pid) openProject(pid).finally(() => { deepLinkPending.current = false })
+    else {
+      deepLinkPending.current = false
+      if (params.get('page') === 'projects') setStep('projects')
+    }
   }, [])
 
   // mirror the current page into the URL so reload and copy-link restore it
@@ -48,6 +69,8 @@ export function App() {
       step === 'projects' ? '/?page=projects'
       : (step === 'review' || step === 'create') && projectId ? `/?project=${projectId}`
       : '/'
+    // a deep link is still resolving — rewriting the URL now would drop the id it carries
+    if (deepLinkPending.current) return
     if (window.location.pathname + window.location.search !== url) {
       window.history.replaceState(null, '', url)
     }
@@ -61,27 +84,21 @@ export function App() {
 
   useEffect(() => {
     if (step !== 'input' && step !== 'projects') return
-    api.listProjects().then(setSavedProjects)
+    api.listProjects()
+      .then(ps => { setSavedProjects(ps); setListError('') })
+      .catch(e => setListError(String(e.message ?? e)))
   }, [step])
 
   // reflect external edits (e.g. Claude PATCHing tasks via the API) while reviewing
   useEffect(() => {
     if (step !== 'review' || !projectId) return
     const poll = setInterval(async () => {
+      if (document.hidden) return // a backgrounded tab would otherwise poll forever
       try {
         const p = await api.getProject(projectId)
-        const fresh = planToMarkdown(p.title, p.tasks)
-        if (fresh === serverMd.current) return
+        if (planToMarkdown(p.title, p.tasks) === serverMd.current) return
         // ponytail: a done-toggle PATCH racing an external edit can be briefly overwritten; refetch-after-write if it ever matters
-        const doneSet = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
-        serverMd.current = fresh
-        setMd(fresh)
-        setDone(doneSet)
-        syncedDone.current = doneSet
-        setTaskIds(p.tasks.map(t => t.id))
-        setDiagram(p.diagram ?? '')
-        setSeqDiagram(p.sequenceDiagram ?? '')
-        setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
+        hydrate(p)
       } catch { /* api unreachable — keep reviewing locally */ }
     }, 3000)
     return () => clearInterval(poll)
@@ -95,7 +112,6 @@ export function App() {
       const tid = taskIds[i]
       if (!tid) return
       api.setTaskDone(projectId, tid, isDone)
-        .then(r => { if (!r.ok) console.warn(`done sync failed for task ${i}: ${r.status}`) })
         .catch(e => console.warn(`done sync failed for task ${i}:`, e))
     }
     for (const i of done) if (!prev.has(i)) patch(i, true)
@@ -105,6 +121,11 @@ export function App() {
 
   async function saveProject() {
     if (saving.current) return
+    // A PUT replaces every task with fresh ids, so re-saving an unchanged plan invalidates the
+    // ids the done-sync effect is holding — any toggle racing it then PATCHes a deleted task and
+    // is silently lost. Nothing changed means nothing to save.
+    const unchanged = projectId !== null && planToMarkdown(planTitle || 'Untitled plan', tasks) === serverMd.current
+    if (unchanged) return
     saving.current = true
     setSaveError('')
     try {
@@ -135,24 +156,14 @@ export function App() {
 
   async function openProject(id: string) {
     try {
-      const p = await api.getProject(id)
-      const doneSet = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
-      const fresh = planToMarkdown(p.title, p.tasks)
-      setMd(fresh)
-      setDone(doneSet)
+      hydrate(await api.getProject(id))
       setCreated([])
-      setTaskIds(p.tasks.map(t => t.id))
-      setDiagram(p.diagram ?? '')
-      setSeqDiagram(p.sequenceDiagram ?? '')
-      setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
-      syncedDone.current = doneSet
-      serverMd.current = fresh
-      setProjectId(p.id)
       setSaveError('')
+      setOpenError('')
       setCameFrom('projects')
       setStep('review')
     } catch (e: any) {
-      setError(String(e.message ?? e))
+      setOpenError(String(e.message ?? e))
     }
   }
 
@@ -167,20 +178,20 @@ export function App() {
     }
   }
 
-  function newPlan() {
-    setMd(''); setDone(new Set()); setCreated([])
+  // edited markdown IS a new plan: it detaches from the saved project, and the old diagram no
+  // longer matches the task indexes. One reset, so the two entry points cannot drift apart.
+  function editMd(value: string) {
+    setMd(value)
+    setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([])
     setDiagram(''); setSeqDiagram(''); setTaskNodes([])
     syncedDone.current = new Set(); serverMd.current = ''
     setSaveError('')
-    setStep('input')
   }
 
-  function editMd(value: string) {
-    setMd(value)
-    setDone(new Set()); setCreated([])
-    setProjectId(null); setTaskIds([]); syncedDone.current = new Set()
-    setDiagram(''); setSeqDiagram(''); setTaskNodes([]) // edited markdown is a new plan — old diagram no longer matches task indexes
+  function newPlan() {
+    editMd('')
+    setStep('input')
   }
 
   function startReview() {
@@ -204,11 +215,24 @@ export function App() {
 
   return (
     <Suspense fallback={null}>
+      {/* `error` is set by paths that can fire on any step (opening a project, a deep link,
+          loading teams); without this banner those failures were completely silent */}
+      {openError && (
+        <div className="card" role="alert" style={{
+          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 100,
+          maxWidth: 'min(680px, calc(100vw - 32px))', borderColor: 'var(--warn-border)',
+          display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--warn)', minWidth: 0 }}>⚠ {openError}</span>
+          <button className="btn-ghost" style={{ height: 26, fontSize: 12, padding: '0 10px', marginLeft: 'auto' }}
+            onClick={() => setOpenError('')}>Dismiss</button>
+        </div>
+      )}
       {step === 'input' ? (
         <InputPage
           md={md}
           tasks={tasks}
-          hasProjects={savedProjects.length > 0}
+          hasProjects={savedProjects.length > 0 || listError !== ''}
           onMdChange={editMd}
           onShowProjects={() => setStep('projects')}
           onStartReview={startReview}
@@ -232,7 +256,7 @@ export function App() {
           saveError={saveError}
           backLabel={cameFrom === 'projects' ? '← Projects' : '← Edit plan'}
           onBack={() => setStep(cameFrom)}
-          onShip={() => setStep('create')}
+          onShip={() => { setCreated([]); setStep('create') }}
           diagram={diagram}
           seqDiagram={seqDiagram}
           taskNodes={taskNodes}

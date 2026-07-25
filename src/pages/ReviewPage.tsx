@@ -1,6 +1,13 @@
 import { Fragment, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { resolveDepIndex, type Task } from '../../shared/parse'
 import { groupTasks } from '../../shared/groups'
+
+// add-or-remove into a copy — React needs a new Set to see the change
+const toggled = (set: Set<number>, i: number) => {
+  const next = new Set(set)
+  next.has(i) ? next.delete(i) : next.add(i)
+  return next
+}
 import { TaskCard } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -42,18 +49,10 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         const di = resolveDepIndex(tasks, dep)
         return di === -1 ? null : { done: done.has(di) }
       }}
-      onToggle={() => setDone(prev => {
-        const next = new Set(prev)
-        next.has(i) ? next.delete(i) : next.add(i)
-        return next
-      })}
+      onToggle={() => setDone(prev => toggled(prev, i))}
       onSelect={shownDiagram ? () => setSelected(i) : undefined}
       collapsed={!expanded.has(i)}
-      onToggleExpand={() => setExpanded(prev => {
-        const next = new Set(prev)
-        next.has(i) ? next.delete(i) : next.add(i)
-        return next
-      })}
+      onToggleExpand={() => setExpanded(prev => toggled(prev, i))}
     />
   )
   const body = view === 'focus' ? (
@@ -67,26 +66,20 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         <div className="progress-fill" style={{ width: `${(done.size / tasks.length) * 100}%` }} />
       </div>
     </div>
-    {tracks.map((track, ti) => {
-      const doneInTrack = track.filter(i => done.has(i)).length
-      return (
-        // headers are siblings in the page's flex column, so a single track renders
-        // exactly the flat list it used to — no wrapper, no extra spacing
-        // keyed by the track's lowest task index (unique, and stable across polls)
-        <Fragment key={track[0]}>
-          {tracks.length > 1 ? (<>
-            {/* the track name is the tree's root; its tasks hang off the rail below it */}
-            <div className="track-label" style={{ marginTop: ti > 0 ? 12 : 0 }}>
-              <span className="eyebrow">Track {ti + 1}</span>
-              <span className="track-count">{doneInTrack}/{track.length} done</span>
-            </div>
-            <div className="tree">
-              {track.map(i => <div key={i} className="tree-row">{renderTask(i)}</div>)}
-            </div>
-          </>) : track.map(renderTask)}
-        </Fragment>
-      )
-    })}
+    {/* one track means nothing to parallelise: render the plain list, with no root to hang a rail from */}
+    {tracks.length === 1 ? tracks[0].map(i => renderTask(i)) : tracks.map((track, ti) => (
+      // the track name is the tree's root; its tasks hang off the rail below it.
+      // Keyed by the track's lowest task index — unique, and stable across polls.
+      <Fragment key={track[0]}>
+        <div className="track-label" style={{ marginTop: ti > 0 ? 12 : 0 }}>
+          <span className="eyebrow">Track {ti + 1}</span>
+          <span className="track-count">{track.filter(i => done.has(i)).length}/{track.length} done</span>
+        </div>
+        <div className="tree">
+          {track.map(i => <div key={i} className="tree-row">{renderTask(i)}</div>)}
+        </div>
+      </Fragment>
+    ))}
   </>)
   return (
     <div style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>

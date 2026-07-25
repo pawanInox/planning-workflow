@@ -2,9 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 
 // loaded on first panel open only — keeps mermaid (~1.5MB) out of the main bundle
 let mermaidP: Promise<typeof import('mermaid')['default']> | null = null
-const loadMermaid = () => (mermaidP ??= import('mermaid').then(m => m.default))
+const loadMermaid = () => (mermaidP ??= import('mermaid').then(m => m.default).catch(e => {
+  mermaidP = null // never cache a rejection, or every later render silently does nothing
+  throw e
+}))
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// one-shot guard so a stale-chunk reload can never loop
+const STALE_CHUNK = 'diagram-chunk-reloaded'
 
 // sequence diagrams have no classDef/class — highlight the rendered SVG instead. The task's
 // participants (diagramNodes) get tinted boxes, and every message whose BOTH endpoints belong to
@@ -15,21 +21,30 @@ function highlightActors(root: HTMLElement, source: string, ids: string[]) {
     labels.set(m[1], (m[2] ?? m[1]).trim())
   const wanted = new Set(ids.map(id => labels.get(id) ?? id))
 
-  // actor boxes: tint the task's, dim the rest; remember the x-center of each tinted lifeline
-  const hotX: number[] = []
+  // Find the actor boxes first. A task can carry node ids that exist in the flowchart and appear
+  // in a message label here without ever being declared a `participant` — then nothing matches,
+  // and dimming "the rest" would grey out the entire diagram with nothing highlighted. Leave it
+  // untouched instead, which reads as "this task maps to no lifeline".
+  const boxes: { text: SVGTextElement; rect: SVGRectElement; match: boolean }[] = []
   root.querySelectorAll('text').forEach(t => {
     const rect = t.previousElementSibling as SVGRectElement | null
     if (rect?.tagName.toLowerCase() !== 'rect') return
-    if (wanted.has(t.textContent?.trim() ?? '')) {
+    boxes.push({ text: t as unknown as SVGTextElement, rect, match: wanted.has(t.textContent?.trim() ?? '') })
+  })
+  if (!boxes.some(b => b.match)) return
+
+  const hotX: number[] = []
+  for (const { text, rect, match } of boxes) {
+    if (match) {
       rect.setAttribute('stroke', '#7c5cff')
       rect.setAttribute('stroke-width', '3')
       rect.setAttribute('fill', '#7c5cff33')
       hotX.push(parseFloat(rect.getAttribute('x') ?? '0') + parseFloat(rect.getAttribute('width') ?? '0') / 2)
     } else {
       rect.setAttribute('opacity', '0.35')
-      t.setAttribute('opacity', '0.35')
+      text.setAttribute('opacity', '0.35')
     }
-  })
+  }
   // message lines start/end a few px off the lifeline center (activation margin) — 12px is well
   // under the ~110px minimum gap between adjacent lifelines
   const hot = (v: number) => hotX.some(x => Math.abs(x - v) < 12)
@@ -119,39 +134,39 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
 
   useEffect(() => {
     const n = ++seq.current
+    // one handler for BOTH failure sources: mermaid's lazy import rejecting, and render throwing.
+    // Previously only render was covered, so a failed import left a blank panel and no message.
+    const fail = (e: any) => {
+      document.getElementById(`diagram-${n}`)?.remove() // mermaid leaves a temp element behind on parse errors
+      const msg = String(e?.message ?? e)
+      // Mermaid loads each diagram type as its own lazy chunk, so a tab left open across a
+      // redeploy asks for a hashed file that no longer exists. That is a stale page, not a bad
+      // diagram — reload once to pick up the new build. Browsers word this differently
+      // ("Failed to fetch…" / "error loading…"), so match only the part they agree on. The flag
+      // is never cleared, so this can reload at most once per session and cannot loop.
+      if (/dynamically imported module/i.test(msg)) {
+        if (!sessionStorage.getItem(STALE_CHUNK)) {
+          sessionStorage.setItem(STALE_CHUNK, '1')
+          location.reload()
+          return
+        }
+        if (seq.current === n) setError('the app was updated in the background — reload the page to view this diagram')
+        return
+      }
+      if (seq.current === n) setError(msg)
+    }
     loadMermaid().then(async mermaid => {
       // ponytail: theme read at render time — toggling the app theme mid-view keeps the old diagram theme until the next highlight change
       const dark = document.documentElement.dataset.theme === 'dark'
       mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'neutral' })
-      try {
-        const { svg } = await mermaid.render(`diagram-${n}`, src)
-        if (seq.current === n && ref.current) {
-          ref.current.innerHTML = svg
-          if (!isFlowchart && ids.length) highlightActors(ref.current, source, ids)
-          applyZoom()
-          setError('')
-          sessionStorage.removeItem('diagram-chunk-reloaded') // chunks load fine again; re-arm the one-shot reload
-        }
-      } catch (e: any) {
-        document.getElementById(`diagram-${n}`)?.remove() // mermaid leaves a temp element behind on parse errors
-        const msg = String(e?.message ?? e)
-        // Mermaid loads each diagram type as its own lazy chunk, so a tab left open across a
-        // redeploy asks for a hashed file that no longer exists. That is a stale page, not a
-        // bad diagram — reload once to pick up the new build. The flag stops a reload loop if
-        // the fetch is failing for any other reason.
-        if (/Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(msg)) {
-          if (!sessionStorage.getItem('diagram-chunk-reloaded')) {
-            sessionStorage.setItem('diagram-chunk-reloaded', '1')
-            location.reload()
-            return
-          }
-          if (seq.current === n) setError('the app was updated in the background — reload the page to view this diagram')
-          return
-        }
-        sessionStorage.removeItem('diagram-chunk-reloaded') // a render got far enough to fail for a real reason
-        if (seq.current === n) setError(msg)
+      const { svg } = await mermaid.render(`diagram-${n}`, src)
+      if (seq.current === n && ref.current) {
+        ref.current.innerHTML = svg
+        if (!isFlowchart && ids.length) highlightActors(ref.current, source, ids)
+        applyZoom()
+        setError('')
       }
-    })
+    }).catch(fail)
   }, [src, ids.join(',')]) // ids matter on their own for sequence diagrams, where src never embeds them
 
   const zoomBtn: React.CSSProperties = { height: 26, padding: '0 10px', fontSize: 13, lineHeight: 1 }

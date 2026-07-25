@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { groupTasks } from './groups.ts'
+import { resolveDepIndexes } from './parse.ts'
 import type { Task } from './parse.ts'
 
 type Groupable = Pick<Task, 'title' | 'dependsOn'>
@@ -24,12 +25,14 @@ function assertGroupsAreIndependent(tasks: Groupable[], groups: number[][]) {
 
   tasks.forEach((task, i) => {
     for (const dep of task.dependsOn) {
-      const target = tasks.findIndex(t => t.title.toLowerCase() === dep.title.toLowerCase())
-      if (target === -1) continue
-      assert.equal(
-        groupOf.get(target), groupOf.get(i),
-        `"${task.title}" depends on "${tasks[target].title}", which is in a different group`,
-      )
+      // EVERY task that title could mean — asserting only the first match would mirror the
+      // implementation's own rule and so could never catch an ambiguous title being left behind
+      for (const target of resolveDepIndexes(tasks, dep.title)) {
+        assert.equal(
+          groupOf.get(target), groupOf.get(i),
+          `"${task.title}" depends on "${tasks[target].title}" (index ${target}), which is in a different group`,
+        )
+      }
     }
   })
 }
@@ -97,4 +100,16 @@ test('tasks with no dependencies each become their own group', () => {
 
 test('an empty task list returns no groups', () => {
   assert.deepEqual(groupTasks([]), [])
+})
+
+test('a repeated dependency title keeps every candidate prerequisite in the same group', () => {
+  // 'a' appears twice; task 'c' depends on "a", so BOTH must share c's group — otherwise a track
+  // could be worked to completion while a real prerequisite sits untouched in another track
+  const tasks = plan({ a: [], b: [], 'a ': [], c: ['a'] })
+  const relabelled = tasks.map((t, i) => (i === 2 ? { ...t, title: 'a' } : t))
+  const groups = groupTasks(relabelled)
+  assertGroupsAreIndependent(relabelled, groups)
+  const groupOf = (i: number) => groups.findIndex(g => g.includes(i))
+  assert.equal(groupOf(0), groupOf(3))
+  assert.equal(groupOf(2), groupOf(3))
 })
