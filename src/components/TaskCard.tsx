@@ -221,14 +221,17 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
         opacity: checked ? 0.8 : undefined,
       }}
     >
+      {/* layout in theme.css: the row has to sit on one line on a wide screen but stack on a phone,
+          which no single set of flex values does — see .task-head */}
       <div
         data-task-header=""
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: collapsed && !hasError ? 0 : 10, gap: 8, cursor: 'pointer' }}
+        className="task-head"
+        style={{ marginBottom: collapsed && !hasError ? 0 : 10 }}
       >
         {/* the accessible control stays on the title (a role=button wrapping the Approve
             button would be invalid nesting); the card click above is a mouse convenience */}
         <span
-          style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}
+          className="task-head-title"
           title={titleHint}
           role="button"
           tabIndex={0}
@@ -241,7 +244,7 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
           <span className="icon-chip" style={{ background: `color-mix(in srgb, ${hue} 14%, transparent)` }}>{taskIcon(task)}</span>
           <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>{task.title}</span>
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <span className="task-head-actions">
           {!collapsed && <CopyPromptButton task={task} />}
           {onToggle && !hasError && (
             <button

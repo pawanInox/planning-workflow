@@ -124,6 +124,55 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
     return () => card.removeEventListener('wheel', onWheel)
   }, [])
 
+  // The touch equivalent of the trackpad pinch above. Without it, pinching the diagram on a phone
+  // zooms the whole PAGE, which is never what you want on a panel that has its own zoom. Scale is
+  // measured against the spread at the START of the gesture so it tracks the fingers instead of
+  // drifting. `touch-action` in theme.css stops the browser claiming the gesture first.
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+    const spread = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    let from = 0
+    let fromZoom = 1
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      e.preventDefault() // claim the gesture up front, before the browser starts a page zoom with it
+      from = spread(e.touches)
+      fromZoom = zoomLevel.current
+    }
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !from) return
+      e.preventDefault() // ours even at the limits, so the page never zooms instead
+      const next = Math.min(4, Math.max(1, +(fromZoom * (spread(e.touches) / from)).toFixed(3)))
+      if (next !== zoomLevel.current) setZoom(next)
+    }
+    const onEnd = () => { from = 0 }
+    // Safari (iOS and mac) drives page pinch-zoom from its own non-standard gesture events, which
+    // `touch-action` does not gate — without swallowing these, pinching the panel still scales the
+    // whole site there. `scale` is relative to the gesture start, same as `spread / from` above.
+    let gestureZoom = 1
+    const onGestureStart = (e: any) => { e.preventDefault(); gestureZoom = zoomLevel.current }
+    const onGestureChange = (e: any) => {
+      e.preventDefault()
+      const next = Math.min(4, Math.max(1, +(gestureZoom * e.scale).toFixed(3)))
+      if (next !== zoomLevel.current) setZoom(next)
+    }
+    card.addEventListener('touchstart', onStart, { passive: false })
+    card.addEventListener('touchmove', onMove, { passive: false })
+    card.addEventListener('touchend', onEnd)
+    card.addEventListener('touchcancel', onEnd)
+    card.addEventListener('gesturestart', onGestureStart as EventListener, { passive: false })
+    card.addEventListener('gesturechange', onGestureChange as EventListener, { passive: false })
+    return () => {
+      card.removeEventListener('touchstart', onStart)
+      card.removeEventListener('touchmove', onMove)
+      card.removeEventListener('touchend', onEnd)
+      card.removeEventListener('touchcancel', onEnd)
+      card.removeEventListener('gesturestart', onGestureStart as EventListener)
+      card.removeEventListener('gesturechange', onGestureChange as EventListener)
+    }
+  }, [])
+
   // only highlight ids present in the source — a mermaid `class` line CREATES unknown ids as stray nodes
   const ids = highlightNodes.filter(id => new RegExp(`\\b${escapeRe(id)}\\b`).test(source))
   // classDef/class are flowchart-only syntax; a sequenceDiagram gets its highlight post-render
@@ -176,7 +225,7 @@ export function DiagramPanel({ source, highlightNodes = [] }: {
         ref={cardRef}
         className="card"
         style={{
-          padding: 12, overflowX: 'auto',
+          overflowX: 'auto',
           cursor: zoom > 1 ? 'grab' : undefined,
           userSelect: zoom > 1 ? 'none' : undefined,
           touchAction: zoom > 1 ? 'none' : undefined,

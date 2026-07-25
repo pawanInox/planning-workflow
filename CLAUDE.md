@@ -20,7 +20,7 @@ Use this to read or edit a user's plan while they review it in the app — the r
 
 | Method & path | Body | `data` |
 |---|---|---|
-| `GET /api/v1/projects` | — | `[{ id, title, taskCount, doneCount, updatedAt }]` |
+| `GET /api/v1/projects?page=1&limit=10` | — | **paginated**: `{ items: [{ id, title, taskCount, doneCount, updatedAt }], page, limit, total, totalPages }` — newest first. Both params optional (`page` ≥ 1, `limit` 1–100, default 10); a page past the end returns empty `items`, not an error |
 | `POST /api/v1/projects` | `{ title, tasks: [Task], diagram?, sequenceDiagram? }` | 201, project + tasks (with ids, ordered) |
 | `GET /api/v1/projects/:id` | — | project (incl. `diagram`/`sequenceDiagram` if set) + `tasks` sorted by `order`, each with its own `id` |
 | `PUT /api/v1/projects/:id` | `{ title?, tasks?, diagram?, sequenceDiagram? }` | tasks value replaces ALL tasks (new ids) |

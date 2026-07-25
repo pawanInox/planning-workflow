@@ -2,7 +2,8 @@ import type { NewTask, Project, ProjectSummary, ProjectWithTasks, TaskEntity } f
 
 export interface ProjectRepository {
   create(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
-  list(): Promise<ProjectSummary[]>
+  /** One page, newest first, plus the overall count so callers can compute page numbers. */
+  list(paging: { page: number; limit: number }): Promise<{ items: ProjectSummary[]; total: number }>
   getById(id: string): Promise<ProjectWithTasks | null>
   /** A `tasks` value replaces all of the project's tasks. */
   update(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks | null>

@@ -23,14 +23,21 @@ export class MongooseProjectRepository implements ProjectRepository {
     }
   }
 
-  // ponytail: N+1 count queries per project, switch to one aggregate if lists grow
-  async list(): Promise<ProjectSummary[]> {
-    const projects = await ProjectModel.find().sort({ updatedAt: -1 }).lean()
-    return Promise.all(projects.map(async p => ({
+  // ponytail: 2 count queries per project ON THE PAGE — bounded by `limit` now, so the old N+1
+  // over the whole collection is gone; switch to one aggregate only if a page gets large
+  async list({ page, limit }: { page: number; limit: number }): Promise<{ items: ProjectSummary[]; total: number }> {
+    const total = await ProjectModel.countDocuments()
+    const projects = await ProjectModel.find()
+      .sort({ updatedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean()
+    const items = await Promise.all(projects.map(async p => ({
       project: toProject(p),
       taskCount: await TaskModel.countDocuments({ projectId: p._id }),
       doneCount: await TaskModel.countDocuments({ projectId: p._id, done: true }),
     })))
+    return { items, total }
   }
 
   async getById(id: string): Promise<ProjectWithTasks | null> {

@@ -1,5 +1,14 @@
 import { z } from 'zod'
 
+/** `GET /projects` paging. Coerced because query params arrive as strings, and defaulted so an
+ *  unparameterised request still works. `limit` is capped so one request cannot ask for everything. */
+export const listProjectsSchema = {
+  query: z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+  }),
+}
+
 const dep = z.object({
   title: z.string().default(''),
   reason: z.string().default(''),

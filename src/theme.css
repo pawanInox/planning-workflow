@@ -85,6 +85,13 @@
   --shadow: 5px 5px 0 var(--shadow-color);
 }
 
+/* Nothing in this app scrolls sideways, and the Focus deck's swipe room deliberately overhangs the
+   layout. Clip it at the VIEWPORT: on the ROOT, so the clip actually propagates to the viewport and
+   no sideways scrollbar appears. Putting it on an inner wrapper instead would cut the thrown card at
+   that wrapper's edge, which on a wide window sits well inside the screen. `clip` rather than
+   `hidden` so it creates no scroll container and vertical scrolling is untouched. */
+html, body { overflow-x: clip; }
+
 body {
   margin: 0;
   font-family: var(--ui);
@@ -397,6 +404,35 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   pointer-events: none;
 }
 
+/* Task-card header: title on the left, controls on the right. Side by side while they fit; the
+   controls drop to their own line when they don't, rather than squeezing the title to nothing. */
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+  cursor: pointer;
+}
+.task-head-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.task-head-title > .serif { min-width: 0; overflow-wrap: break-word; }
+.task-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  row-gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .track-label {
   display: flex;
   align-items: baseline;
@@ -447,7 +483,15 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
 
 
 /* the review shell claims exactly one viewport; the split fills what the header leaves */
-.review-shell { height: 100vh; }
+/* Bounds a left-thrown card at the DIAGRAM's left edge: the card is free to travel across the
+   diagram (so it reads as passing behind the frame) but is gone the moment it would emerge past it.
+   The 24px left inset is this shell's own horizontal padding, which is exactly where the diagram
+   column starts — clipping at 0 instead leaves a 24px strip where the card peeks out.
+   The negative right inset leaves the right side completely free to fly off screen. */
+.review-shell {
+  height: 100vh;
+  clip-path: inset(0 -100vw 0 24px);
+}
 
 /* The split owns the viewport and each column scrolls itself, rather than the page scrolling and
    the diagram trying to stay put with `position: sticky`. Sticky was bottom-constrained by the
@@ -468,6 +512,11 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden; /* the card scrolls internally — the column stays put so the toggle/zoom chrome doesn't move */
+  /* paints above the task column: a left-swiped deck card slides BEHIND the frame and disappears
+     at its right edge, rather than being sliced at an arbitrary line or floating over it. Being on
+     top also keeps the diagram's own clicks (drag to pan) working with no pointer-events juggling. */
+  position: relative;
+  z-index: 1;
 }
 /* the task list is the one that scrolls now */
 .review-split > .task-col {
@@ -475,6 +524,24 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   overscroll-behavior: contain;
   min-height: 0;
   padding-bottom: 24px; /* the page's bottom padding used to do this */
+  /* Contain the deck's own stacking (each card carries z-index 10, 9, 8…). Without this those
+     numbers compete directly with the diagram column's z-index and the card wins, painting over
+     the frame instead of sliding behind it. */
+  isolation: isolate;
+}
+
+/* A Focus-deck card is thrown clear of the column when swiped, but `overflow-y: auto` forces
+   overflow-x to auto as well (CSS won't let one axis be visible while the other scrolls), so the
+   card was being sliced off at the column edge. Give the scroll box room on both sides and pull it
+   back out with a negative margin: the content sits exactly where it did, and the card has somewhere
+   to fly. clip-path keeps the extra width from painting over the diagram on the left. */
+.review-split > .task-col:has(.deck) {
+  /* No scroller in Focus view. A vertical scroll box clips whatever leaves it, so a thrown card was
+     being sliced off at the column's top edge near the header — and the deck does not need it: the
+     deck is a fixed-height stage and the card scrolls inside itself. With this visible, the card's
+     only bounds are the shell's clip-path (left, at the diagram) and the root (right, at the
+     viewport), so no swipe-room padding is needed here either. */
+  overflow: visible;
 }
 /* diagram-type toggle stays fixed at the top of the column while the diagram scrolls */
 .diagram-col > .diagram-toggle { flex-shrink: 0; }
@@ -486,20 +553,73 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   display: flex;
 }
 .dpanel > .card {
+  padding: 12px; /* here, not inline, so the mobile rule below can offset the pinned zoom controls */
   flex: 1;
   min-width: 0;
   overflow: auto; /* both axes scroll HERE now, so the pinned zoom controls (on .dpanel) don't move */
   overscroll-behavior: contain; /* at the diagram's scroll edge, don't chain the scroll to the page */
+  /* pan with one finger, but keep PINCH for this panel's own zoom rather than the browser's page
+     zoom — otherwise pinching a zoomable diagram scales the entire site instead */
+  touch-action: pan-x pan-y;
   display: flex;
   flex-direction: column;
   justify-content: safe center; /* center when it fits; align to start when scrollable so the top isn't clipped */
 }
 .diagram-col svg { max-width: 100%; height: auto; }
+.deck-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.deck-hint { font-size: 12px; color: var(--text-muted); }
+
+/* Layer order for a thrown card, side-by-side only: it must pass OVER the sticky header but still
+   slide UNDER the diagram frame, so all three are ordered explicitly rather than left to chance.
+   Scoped to the wide layout — when stacked, the diagram scrolls beneath the header and must not
+   paint over it. */
+@media (min-width: 1024px) {
+  .review-split > .task-col:has(.deck) { position: relative; z-index: 30; }
+  .review-split > .diagram-col { z-index: 40; }
+}
+
 @media (max-width: 1023px) {
   /* stacked: hand scrolling back to the page, since there is no side-by-side to hold still */
   .review-shell { height: auto; }
   .review-split { grid-template-columns: minmax(0, 1fr); flex: none; }
-  .review-split > .diagram-col { height: auto; overflow: visible; }
+  /* A fixed stage for the diagram, so zooming pans INSIDE it. With an auto height the zoomed svg
+     grew the box and pushed every task card down the page — the diagram has to be the only thing
+     that moves. The height has to be definite HERE: on the panel it is a flex item whose automatic
+     minimum size is the (zoomed) svg, which wins over any height set on it. 60vh keeps the first
+     task visible below the diagram. */
+  .review-split > .diagram-col { height: 60vh; overflow: hidden; }
   .review-split > .task-col { overflow-y: visible; padding-bottom: 0; }
-  .diagram-col > .dpanel { min-height: auto; }
+
+  /* the rail's full desktop indent costs a phone too much of the card's text width */
+  .tree { --rail: 14px; }
+
+  /* Four controls never share a line with the title at this width. Hand the title the whole first
+     row, so the controls get the card's full width on the second and wrap within it — beside the
+     title they were instead crushing it to a few characters per line and spilling past the card. */
+  .task-head-title { flex: 1 1 100%; }
+  .task-head-actions { flex-shrink: 1; min-width: 0; }
+
+  /* keyboard-only hint, and it was forcing the three buttons onto separate lines */
+  .deck-hint { display: none; }
+
+  /* The zoom controls are pinned over the panel. On a phone the diagram fills the full width, so
+     its topmost node ran underneath them — give the scroller room to start below instead. */
+  .dpanel > .card { padding-top: 46px; }
+  .deck-actions { gap: 10px; }
+
+  /* ONE scroller on a phone. The deck was a fixed-height box with the card scrolling inside it,
+     so a touch on the card scrolled the card and only the strip around it scrolled the page —
+     which is what made scrolling feel stuck. The top card now sits in flow at its natural height
+     and the page scrolls it; the cards behind stay absolute so the stack still reads as a deck. */
+  .deck { height: auto; min-height: 0; }
+  .deck-card:first-child {
+    position: relative;
+    inset: auto;
+    overflow-y: visible;
+  }
 }

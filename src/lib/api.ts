@@ -1,6 +1,7 @@
 import type { Dep } from '../../shared/parse'
 
 export type ProjectSummary = { id: string; title: string; taskCount: number; doneCount: number; updatedAt: string }
+export type ProjectsPage = { items: ProjectSummary[]; page: number; limit: number; total: number; totalPages: number }
 export type SavedTask = {
   id: string; title: string; problem: string; todo: string; outcome: string
   dependsOn: Dep[]; done: boolean; diagramNodes?: string[]
@@ -12,6 +13,7 @@ export type CreatedIssue = { title: string; url: string }
 export type Meme = { url: string; pageUrl: string; title: string }
 
 const BASE = '/api/v1'
+export const PROJECTS_PER_PAGE = 10
 
 // server responses use the envelope { status: 'ok'|'error', message, data }
 async function unwrap<T>(r: Response): Promise<T> {
@@ -28,8 +30,8 @@ const send = (method: string, body: unknown) => ({
 
 // ponytail: plain fetch wrappers — swap for React Query/SWR if caching/retries ever matter
 export const api = {
-  listProjects: (): Promise<ProjectSummary[]> =>
-    fetch(`${BASE}/projects`).then(r => unwrap<ProjectSummary[]>(r)).catch(() => []),
+  listProjects: (page = 1, limit = PROJECTS_PER_PAGE): Promise<ProjectsPage> =>
+    fetch(`${BASE}/projects?page=${page}&limit=${limit}`).then(r => unwrap<ProjectsPage>(r)),
 
   getProject: (id: string): Promise<ProjectWithTasks> =>
     fetch(`${BASE}/projects/${id}`).then(r => unwrap<ProjectWithTasks>(r)),

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { parsePlan, planToMarkdown } from '../shared/parse'
-import { api, type CreatedIssue, type ProjectSummary, type ProjectWithTasks, type Team } from './lib/api'
+import { api, type CreatedIssue, type ProjectsPage as ProjectsPageData, type ProjectSummary, type ProjectWithTasks, type Team } from './lib/api'
 
 // route-level code splitting (React.lazy + Suspense) while keeping named exports
 const InputPage = lazy(() => import('./pages/InputPage').then(m => ({ default: m.InputPage })))
@@ -25,7 +25,8 @@ export function App() {
   const [diagram, setDiagram] = useState('')
   const [seqDiagram, setSeqDiagram] = useState('')
   const [taskNodes, setTaskNodes] = useState<string[][]>([]) // diagram node ids per task, index-aligned with tasks
-  const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([])
+  const [projectsPage, setProjectsPage] = useState<ProjectsPageData | null>(null)
+  const [page, setPage] = useState(1)
   const [saveError, setSaveError] = useState('')
   const [listError, setListError] = useState('')
   const saving = useRef(false)
@@ -84,10 +85,10 @@ export function App() {
 
   useEffect(() => {
     if (step !== 'input' && step !== 'projects') return
-    api.listProjects()
-      .then(ps => { setSavedProjects(ps); setListError('') })
+    api.listProjects(page)
+      .then(p => { setProjectsPage(p); setListError('') })
       .catch(e => setListError(String(e.message ?? e)))
-  }, [step])
+  }, [step, page])
 
   // reflect external edits (e.g. Claude PATCHing tasks via the API) while reviewing
   useEffect(() => {
@@ -171,8 +172,11 @@ export function App() {
     if (!window.confirm(`Delete "${p.title}" and its ${p.taskCount} task${p.taskCount === 1 ? '' : 's'}?`)) return
     try {
       await api.deleteProject(p.id)
-      setSavedProjects(prev => prev.filter(x => x.id !== p.id))
       if (projectId === p.id) { setProjectId(null); setTaskIds([]) }
+      // deleting the only row on the last page would strand the user on an empty one
+      const wasLastOnPage = (projectsPage?.items.length ?? 0) <= 1 && page > 1
+      if (wasLastOnPage) setPage(page - 1)
+      else setProjectsPage(await api.listProjects(page)) // refetch: the page's contents shifted up
     } catch (e: any) {
       setListError(String(e.message ?? e))
     }
@@ -232,14 +236,15 @@ export function App() {
         <InputPage
           md={md}
           tasks={tasks}
-          hasProjects={savedProjects.length > 0 || listError !== ''}
+          hasProjects={(projectsPage?.total ?? 0) > 0 || listError !== ''}
           onMdChange={editMd}
           onShowProjects={() => setStep('projects')}
           onStartReview={startReview}
         />
       ) : step === 'projects' ? (
         <ProjectsPage
-          projects={savedProjects}
+          page={projectsPage}
+          onPageChange={setPage}
           error={listError}
           onOpen={openProject}
           onDelete={deleteProject}

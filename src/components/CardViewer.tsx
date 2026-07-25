@@ -9,6 +9,13 @@ const reducedMotion = () =>
 
 type Dir = 'left' | 'right'
 const THROW = 120
+// A released card must keep going the way it was thrown — never snap back to a fixed distance,
+// which reads as the card refusing to follow your hand. It continues from wherever the drag ended,
+// far enough to be gone: off screen to the right, behind the diagram frame to the left.
+const EXIT_MIN = 900
+// the deck waits this long before dropping the card, so it must match the CSS duration below or
+// the card is culled mid-flight
+const EXIT_MS = 420
 
 function Meme({ query, fallback }: { query: string; fallback?: ReactNode }) {
   const [meme, setMeme] = useState<{ url: string; pageUrl: string; title: string } | null>(null)
@@ -80,7 +87,7 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
     commitTimer.current = setTimeout(() => {
       setQueue(q => q.slice(1))
       setDx(0); setLeaving(null)
-    }, 280)
+    }, EXIT_MS)
   }
 
   function undo() {
@@ -214,9 +221,16 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
           queue.slice(0, 3).map((taskIdx, stackPos) => {
             const t = tasks[taskIdx]
             const isTop = stackPos === 0
-            const throwX = leaving === 'right' ? 900 : leaving === 'left' ? -900 : 0
-            const enterX = entering === 'right' ? 900 : entering === 'left' ? -900 : 0
+            // continue past the drag rather than resetting to a constant (dx still holds where the
+            // hand let go); a keyboard/button commit has dx 0 and just uses the minimum
+            const throwX = leaving === 'right' ? Math.max(EXIT_MIN, dx + 400)
+              : leaving === 'left' ? Math.min(-EXIT_MIN, dx - 400) : 0
+            const enterX = entering === 'right' ? EXIT_MIN : entering === 'left' ? -EXIT_MIN : 0
             const x = isTop ? (leaving ? throwX : entering ? enterX : dx) : 0
+            // fade on the way OUT only. Fading the ENTERING card too would hide it until `entering`
+            // clears, and that clear rides on requestAnimationFrame — if a frame is delayed, an
+            // undone card would sit invisible. It slides back in at full opacity instead.
+            const gone = isTop && !!leaving
             const transform = isTop
               ? `translateX(${x}px) rotate(${x * 0.05}deg)`
               : `scale(${1 - stackPos * 0.045}) translateY(${stackPos * 14}px)`
@@ -232,7 +246,12 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                   zIndex: 10 - stackPos,
                   borderTop: `4px solid ${cardHue(taskIdx)}`,
                   transform,
-                  transition: (dragging || entering) && isTop ? 'none' : 'transform 0.28s ease',
+                  opacity: gone ? 0 : 1,
+                  transition: (dragging || entering) && isTop
+                    ? 'none'
+                    // ease-OUT on the throw so it leaves with momentum; ease-IN on the fade so the
+                    // card stays solid while it travels instead of dissolving on the spot
+                    : `transform ${EXIT_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${EXIT_MS}ms ease-in`,
                   cursor: isTop ? 'grab' : 'default',
                   userSelect: dragging ? 'none' : 'auto',
                 }}
@@ -286,10 +305,12 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
       </div>
 
       {queue.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div className="deck-actions">
           <button className="btn-ghost" onClick={undo} disabled={history.length === 0}>↩ Undo</button>
           <button className="btn-ghost" onClick={() => commit('left')}>✗ Skip</button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>drag the card or use ← → · z to undo</span>
+          {/* hidden on touch layouts: it names keys a phone does not have, and squeezing it
+              between the buttons was breaking each of them onto its own line */}
+          <span className="deck-hint">drag the card or use ← → · z to undo</span>
           <button className="btn-done" onClick={() => commit('right')}>✓ Approve</button>
         </div>
       )}

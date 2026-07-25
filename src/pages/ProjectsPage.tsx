@@ -1,13 +1,17 @@
-import type { ProjectSummary } from '../lib/api'
+import type { ProjectsPage as ProjectsPageData, ProjectSummary } from '../lib/api'
 import { ThemeToggle } from '../components/ThemeToggle'
 
-export function ProjectsPage({ projects, error, onOpen, onDelete, onNewPlan }: {
-  projects: ProjectSummary[]
+export function ProjectsPage({ page, error, onOpen, onDelete, onNewPlan, onPageChange }: {
+  page: ProjectsPageData | null
   error: string
   onOpen: (id: string) => void
   onDelete: (p: ProjectSummary) => void
   onNewPlan: () => void
+  onPageChange: (page: number) => void
 }) {
+  const projects = page?.items ?? []
+  const first = page ? (page.page - 1) * page.limit + 1 : 0
+  const last = first + projects.length - 1
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <header style={{
@@ -15,7 +19,10 @@ export function ProjectsPage({ projects, error, onOpen, onDelete, onNewPlan }: {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '14px 0 10px', borderBottom: '1px solid var(--border)',
       }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>📁 Projects</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>
+          📁 Projects
+          {page && page.total > 0 && <span className="eyebrow" style={{ marginLeft: 10 }}>{page.total} saved</span>}
+        </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ThemeToggle />
           <button className="btn-primary" onClick={onNewPlan}>+ New plan</button>
@@ -54,6 +61,15 @@ export function ProjectsPage({ projects, error, onOpen, onDelete, onNewPlan }: {
             ))}
           </div>
         </div>
+      )}
+
+      {page && page.totalPages > 1 && (
+        <nav aria-label="Projects pages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <button className="btn-ghost" disabled={page.page <= 1} onClick={() => onPageChange(page.page - 1)}>← Newer</button>
+          {/* which rows you are looking at, not just a page number — the range is the useful part */}
+          <span className="eyebrow" style={{ whiteSpace: 'nowrap' }}>{first}–{last} of {page.total}</span>
+          <button className="btn-ghost" disabled={page.page >= page.totalPages} onClick={() => onPageChange(page.page + 1)}>Older →</button>
+        </nav>
       )}
 
       {error && <div className="card" style={{ borderColor: 'var(--danger-border)', color: 'var(--danger)', fontSize: 13 }}>{error}</div>}

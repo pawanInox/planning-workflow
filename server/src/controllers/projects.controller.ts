@@ -7,12 +7,17 @@ export function makeProjectsController(service: ProjectsService) {
       ok(res, 'project created', await service.createProject(req.body), 201)
     }),
 
-    list: asyncHandler(async (_req, res) => {
-      const summaries = await service.listProjects()
-      ok(res, 'projects listed', summaries.map(s => ({
-        id: s.project.id, title: s.project.title,
-        taskCount: s.taskCount, doneCount: s.doneCount, updatedAt: s.project.updatedAt,
-      })))
+    list: asyncHandler(async (req, res) => {
+      // `validate` has coerced and defaulted these already
+      const { page, limit } = req.query as unknown as { page: number; limit: number }
+      const result = await service.listProjects({ page, limit })
+      ok(res, 'projects listed', {
+        ...result,
+        items: result.items.map(s => ({
+          id: s.project.id, title: s.project.title,
+          taskCount: s.taskCount, doneCount: s.doneCount, updatedAt: s.project.updatedAt,
+        })),
+      })
     }),
 
     get: asyncHandler(async (req, res) => {

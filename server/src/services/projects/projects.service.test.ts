@@ -25,11 +25,12 @@ function fakeRepo(): { projects: ProjectRepository; tasks: TaskRepository; taskM
       tasks.forEach((t, i) => { const e = fill(t, p.id, i); taskMap.set(e.id, e) })
       return { ...p, tasks: tasksOf(p.id) }
     },
-    async list() {
-      return [...projects.values()].map(project => {
+    async list({ page, limit }) {
+      const all = [...projects.values()].map(project => {
         const ts = tasksOf(project.id)
         return { project, taskCount: ts.length, doneCount: ts.filter(t => t.done).length }
       })
+      return { items: all.slice((page - 1) * limit, page * limit), total: all.length }
     },
     async getById(pid) {
       const p = projects.get(pid)
@@ -133,4 +134,35 @@ test('deleteProject cascades its tasks', async () => {
   await svc.deleteProject(p.id)
   assert.equal(repo.taskMap.size, 0)
   await assert.rejects(svc.getProject(p.id), NotFoundError)
+})
+
+test('listProjects pages the results and reports how many pages there are', async () => {
+  const service = makeProjectsService(fakeRepo())
+  for (const title of ['a', 'b', 'c', 'd', 'e']) {
+    await service.createProject({ title, tasks: [{ title: 't', problem: 'p', todo: 'd', outcome: 'o' }] })
+  }
+
+  const first = await service.listProjects({ page: 1, limit: 2 })
+  assert.equal(first.items.length, 2)
+  assert.equal(first.total, 5)
+  assert.equal(first.totalPages, 3) // 5 over 2 rounds UP, or the last project is unreachable
+  assert.equal(first.page, 1)
+
+  const last = await service.listProjects({ page: 3, limit: 2 })
+  assert.equal(last.items.length, 1)
+
+  // pages must not overlap or drop anything
+  const second = await service.listProjects({ page: 2, limit: 2 })
+  const seen = [...first.items, ...second.items, ...last.items].map(s => s.project.title)
+  assert.equal(new Set(seen).size, 5)
+
+  // past the end is empty, not an error
+  assert.deepEqual((await service.listProjects({ page: 99, limit: 2 })).items, [])
+})
+
+test('an empty collection still reads as page 1 of 1', async () => {
+  const page = await makeProjectsService(fakeRepo()).listProjects({ page: 1, limit: 10 })
+  assert.deepEqual(page.items, [])
+  assert.equal(page.total, 0)
+  assert.equal(page.totalPages, 1) // "page 1 of 0" would be nonsense in the UI
 })

@@ -1,10 +1,18 @@
 import type { NewTask, ProjectRepository, ProjectSummary, ProjectWithTasks, TaskEntity, TaskRepository } from '../../repositories/ports.ts'
+
+export type ProjectsPage = {
+  items: ProjectSummary[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
 import { NotFoundError } from '../errors.ts'
 
 /** Input shape is validated by `schemas/projects.schema.ts` at the route; this layer holds business rules only. */
 export interface ProjectsService {
   createProject(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
-  listProjects(): Promise<ProjectSummary[]>
+  listProjects(paging: { page: number; limit: number }): Promise<ProjectsPage>
   getProject(id: string): Promise<ProjectWithTasks>
   updateProject(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
   deleteProject(id: string): Promise<void>
@@ -17,7 +25,11 @@ export function makeProjectsService({ projects, tasks }: { projects: ProjectRepo
   return {
     createProject: data => projects.create(data),
 
-    listProjects: () => projects.list(),
+    async listProjects({ page, limit }) {
+      const { items, total } = await projects.list({ page, limit })
+      // at least 1 so an empty collection still reads as "page 1 of 1" rather than "of 0"
+      return { items, page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) }
+    },
 
     async getProject(id) {
       const p = await projects.getById(id)
