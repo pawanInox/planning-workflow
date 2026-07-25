@@ -58,7 +58,7 @@ export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, 
       <header style={{ padding: '8px 0 0', textAlign: 'center' }}>
         <span className="eyebrow" style={{ display: 'block', marginBottom: 14 }}>◆ quest log ◆</span>
         <h1 className="serif" style={{ fontSize: 44, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
-          Plan&nbsp;<span style={{ color: 'var(--accent)' }}>→</span>&nbsp;Linear
+          Yak Dai&nbsp;<span style={{ color: 'var(--accent)' }}>Tham Eng</span>
         </h1>
         <div className="eyebrow" style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', margin: '16px 0 0', fontSize: 11 }}>
           <span><span style={{ color: 'var(--accent)' }}>01</span> paste a plan</span>
