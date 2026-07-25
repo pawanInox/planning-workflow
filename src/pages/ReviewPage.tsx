@@ -86,12 +86,9 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
       className={shownDiagram ? 'review-shell' : undefined}
       style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        gap: 8, rowGap: 10, flexWrap: 'wrap',
-        padding: '14px 0 10px', borderBottom: '1px solid var(--border)',
-      }}>
+      {/* layout in theme.css (.review-head) — a phone needs it full-bleed, which the inline padding
+          could not be overridden to do */}
+      <header className="review-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <button className="btn-ghost" onClick={onBack}>{backLabel}</button>
           <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

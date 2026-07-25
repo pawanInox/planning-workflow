@@ -15,7 +15,13 @@ function CopyButton({ label, title, text }: { label: string; title: string; text
         setTimeout(() => setCopied(false), 2000)
       }}
     >
-      {copied ? '✓ Copied' : label}
+      {/* Both labels share one grid cell, so the button is always as wide as the wider of them and
+          the "✓ Copied" swap cannot resize it. It used to shrink on click, which reflowed the
+          wrapped button row on a phone and moved the other buttons out from under your finger. */}
+      <span style={{ display: 'grid', placeItems: 'center' }}>
+        <span style={{ gridArea: '1 / 1', visibility: copied ? 'hidden' : undefined }}>{label}</span>
+        <span style={{ gridArea: '1 / 1', visibility: copied ? undefined : 'hidden' }}>✓ Copied</span>
+      </span>
     </button>
   )
 }
@@ -210,6 +216,19 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
       ⚠ {task.errors.join(', ')} — this task will be skipped.
     </p>
   )
+  // Rendered TWICE — beside the title and again in the card's footer — with CSS showing exactly one
+  // per width (see .approve-head / .task-foot). A single node can't be in the header row on a wide
+  // screen and at the card's bottom on a phone: they are different parents, which no CSS moves it
+  // between. The hidden copy is display:none, so it is out of the a11y tree too.
+  const approveButton = (where: string) => onToggle && !hasError && (
+    <button
+      className={`btn-done ${where}${checked ? ' checked' : ''}`}
+      style={{ height: 28, fontSize: 12, padding: '0 12px', whiteSpace: 'nowrap' }}
+      onClick={onToggle}
+    >
+      {checked ? '✓ Approved' : 'Approve'}
+    </button>
+  )
   return (
     <div
       className="card"
@@ -246,15 +265,7 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
         </span>
         <span className="task-head-actions">
           {!collapsed && <CopyPromptButton task={task} />}
-          {onToggle && !hasError && (
-            <button
-              className={`btn-done${checked ? ' checked' : ''}`}
-              style={{ height: 28, fontSize: 12, padding: '0 12px', whiteSpace: 'nowrap' }}
-              onClick={onToggle}
-            >
-              {checked ? '✓ Approved' : 'Approve'}
-            </button>
-          )}
+          {approveButton('approve-head')}
           <span className="pill" style={{ color: hue, background: `color-mix(in srgb, ${hue} 14%, transparent)`, whiteSpace: 'nowrap' }}>
             Task {index + 1}
           </span>
@@ -272,6 +283,7 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
           {!hasError && <TaskSections task={task} />}
         </div>
       </div>
+      <div className="task-foot">{approveButton('approve-foot')}</div>
     </div>
   )
 }

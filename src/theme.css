@@ -422,13 +422,27 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   min-width: 0;
 }
 .task-head-title > .serif { min-width: 0; overflow-wrap: break-word; }
+/* the Focus card's top row: hero icon, QUEST pill, copy buttons — wraps for the same reason */
+.quest-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  row-gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* Approve sits beside the title at this width; the footer copy of it is the phone's (see below) */
+.task-foot { display: none; }
+/* no Approve for an error task (it gets skipped at ship time), so don't reserve a row for one */
+.task-foot:empty { display: none; }
 .task-head-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 6px;
-  row-gap: 8px;
+  gap: 10px; /* the two copy buttons read as one blob at 6px */
+  row-gap: 10px;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -481,6 +495,21 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   transition: grid-template-rows 240ms cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 240ms;
 }
 
+
+.review-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+  padding: 14px 0 10px;
+  border-bottom: 1px solid var(--border);
+}
 
 /* the review shell claims exactly one viewport; the split fills what the header leaves */
 /* Bounds a left-thrown card at the DIAGRAM's left edge: the card is free to travel across the
@@ -585,7 +614,15 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
 
 @media (max-width: 1023px) {
   /* stacked: hand scrolling back to the page, since there is no side-by-side to hold still */
-  .review-shell { height: auto; }
+  /* clip-path off too: its left inset bounds a thrown card at the DIAGRAM's left edge, and stacked
+     there is no diagram beside the card to disappear behind — it just sliced the card mid-swipe.
+     `overflow-x: clip` on html/body still keeps a thrown card from adding a scrollbar. */
+  .review-shell { height: auto; clip-path: none; }
+
+  /* Full-bleed header. The shell's 24px side padding left a strip at each edge with no header
+     background, so a card swiped past the top showed up BESIDE the header instead of sliding
+     under it — which read as the header being too narrow. */
+  .review-head { margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
   .review-split { grid-template-columns: minmax(0, 1fr); flex: none; }
   /* A fixed stage for the diagram, so zooming pans INSIDE it. With an auto height the zoomed svg
      grew the box and pushed every task card down the page — the diagram has to be the only thing
@@ -598,10 +635,19 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   /* the rail's full desktop indent costs a phone too much of the card's text width */
   .tree { --rail: 14px; }
 
-  /* Four controls never share a line with the title at this width. Hand the title the whole first
-     row, so the controls get the card's full width on the second and wrap within it — beside the
-     title they were instead crushing it to a few characters per line and spilling past the card. */
-  .task-head-title { flex: 1 1 100%; }
+  /* Approve moves to the card's bottom-right, where a thumb is, and out of the crowded header */
+  .btn-done.approve-head { display: none; }
+  .task-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+  /* The copy buttons never share a line with the title at this width, so hand the title the whole
+     first row and let them wrap within the card's full width below it — beside the title they were
+     crushing it to a few characters per line and spilling past the card. Only when they're there:
+     a collapsed card's header is just the title and its Task-N pill, which fit on one line. */
+  .task-head:has(.btn-ghost) > .task-head-title { flex: 1 1 100%; }
+  /* Collapsed, the only control left is the Task-N pill, and both fit on one row — but only from a
+     zero basis: flex wraps a line before it shrinks anything on it, so an auto-width title claimed
+     the whole row and left the pill sitting alone on a second one. */
+  .task-head-title { flex: 1 1 0; }
   .task-head-actions { flex-shrink: 1; min-width: 0; }
 
   /* keyboard-only hint, and it was forcing the three buttons onto separate lines */

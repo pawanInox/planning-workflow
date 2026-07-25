@@ -267,14 +267,17 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                   </>
                 )}
                 <span className="level-num">{String(taskIdx + 1).padStart(2, '0')}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                {/* .quest-head wraps and .task-head-actions spaces the buttons — the same pair the
+                    List card uses. In a plain span the two buttons had no gap at all and the
+                    unwrappable row pushed them past the card's edge on a phone. */}
+                <div className="quest-head">
                   <span className="icon-hero" style={{ background: `color-mix(in srgb, ${cardHue(taskIdx)} 16%, transparent)` }}>
                     {taskIcon(t)}
                   </span>
                   <span className="pill" style={{ color: 'var(--on-lime)', background: 'var(--lime)', fontFamily: 'var(--ui)', fontWeight: 700, fontSize: 12, padding: '2px 9px', letterSpacing: '0.08em' }}>
                     QUEST {String(taskIdx + 1).padStart(2, '0')}/{String(tasks.length).padStart(2, '0')}
                   </span>
-                  <span style={{ marginLeft: 'auto' }}>
+                  <span className="task-head-actions">
                     <CopyPromptButton task={t} />
                   </span>
                 </div>
