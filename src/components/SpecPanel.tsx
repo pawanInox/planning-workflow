@@ -14,9 +14,6 @@ const displayName = (entry: SpecEntry) => {
   return key ? { key, value: entry[key] as string } : null
 }
 
-/** What to call an entry outside this panel (a task card's ref chips) — its name, else its id. */
-export const specEntryLabel = (entry: SpecEntry) => displayName(entry)?.value ?? entry.id
-
 // values are undeclared, so anything that isn't already a string gets shown as its JSON
 const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 1))
 

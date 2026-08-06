@@ -12,7 +12,7 @@ import { TaskCard } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { DiagramPanel } from '../components/DiagramPanel'
-import { SpecPanel, specEntryLabel } from '../components/SpecPanel'
+import { SpecPanel } from '../components/SpecPanel'
 import type { Spec } from '../lib/api'
 
 export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [] }: {
@@ -47,12 +47,6 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   const active = view === 'focus' ? focusTop : selected
   // independent tracks: no track depends on a task in another, so each can be handed off separately
   const tracks = useMemo(() => groupTasks(tasks), [tasks])
-  // id → display name for the cards' ref chips; a miss is an unknown ref, which they show as such
-  const specNames = useMemo(
-    () => new Map(Object.values(spec ?? {}).flat().map(e => [e.id, specEntryLabel(e)])),
-    [spec],
-  )
-  const resolveRef = (id: string) => specNames.get(id) ?? null
   const renderTask = (i: number) => (
     <TaskCard
       key={i}
@@ -64,15 +58,13 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         return di === -1 ? null : { done: done.has(di) }
       }}
       onToggle={() => setDone(prev => toggled(prev, i))}
-      specRefs={taskRefs[i]}
-      resolveRef={resolveRef}
       onSelect={sideCol ? () => setSelected(i) : undefined}
       collapsed={!expanded.has(i)}
       onToggleExpand={() => setExpanded(prev => toggled(prev, i))}
     />
   )
   const body = view === 'focus' ? (
-    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} taskRefs={taskRefs} resolveRef={resolveRef} />
+    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
   ) : (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
       <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
