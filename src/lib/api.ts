@@ -4,9 +4,15 @@ export type ProjectSummary = { id: string; title: string; taskCount: number; don
 export type ProjectsPage = { items: ProjectSummary[]; page: number; limit: number; total: number; totalPages: number }
 export type SavedTask = {
   id: string; title: string; problem: string; todo: string; outcome: string
-  dependsOn: Dep[]; done: boolean; diagramNodes?: string[]
+  dependsOn: Dep[]; done: boolean; diagramNodes?: string[]; specRefs?: string[]
 }
-export type ProjectWithTasks = { id: string; title: string; diagram?: string; sequenceDiagram?: string; tasks: SavedTask[] }
+/** One thing the plan specifies. Only `id` is declared — the rest is whatever the planning skill
+ *  wrote, so nothing here (or in SpecPanel) may key off a particular field name. */
+export type SpecEntry = { id: string } & Record<string, unknown>
+/** Section name → its entries. Sections are OPEN: `dataModels`, `api`, `interfaces` are typical,
+ *  not a closed list. Entry ids are unique across the whole spec — a task's `specRefs` name them bare. */
+export type Spec = Record<string, SpecEntry[]>
+export type ProjectWithTasks = { id: string; title: string; diagram?: string; sequenceDiagram?: string; spec?: Spec; tasks: SavedTask[] }
 export type TaskPayload = Omit<SavedTask, 'id'>
 export type Team = { id: string; name: string; key: string }
 export type CreatedIssue = { title: string; url: string }

@@ -14,13 +14,18 @@ function fakeRepo(): { projects: ProjectRepository; tasks: TaskRepository; taskM
     id: id(), projectId, order,
     title: t.title, problem: t.problem, todo: t.todo, outcome: t.outcome,
     dependsOn: t.dependsOn ?? [], done: t.done ?? false, diagramNodes: t.diagramNodes ?? [],
+    specRefs: t.specRefs ?? [],
   })
   const tasksOf = (projectId: string) =>
     [...taskMap.values()].filter(t => t.projectId === projectId).sort((a, b) => a.order - b.order)
 
   const projectsRepo: ProjectRepository = {
-    async create({ title, tasks, diagram }) {
-      const p: Project = { id: id(), title, createdAt: new Date(), updatedAt: new Date(), ...(diagram !== undefined ? { diagram } : {}) }
+    async create({ title, tasks, diagram, spec }) {
+      const p: Project = {
+        id: id(), title, createdAt: new Date(), updatedAt: new Date(),
+        ...(diagram !== undefined ? { diagram } : {}),
+        ...(spec !== undefined ? { spec } : {}),
+      }
       projects.set(p.id, p)
       tasks.forEach((t, i) => { const e = fill(t, p.id, i); taskMap.set(e.id, e) })
       return { ...p, tasks: tasksOf(p.id) }
@@ -36,11 +41,12 @@ function fakeRepo(): { projects: ProjectRepository; tasks: TaskRepository; taskM
       const p = projects.get(pid)
       return p ? { ...p, tasks: tasksOf(pid) } : null
     },
-    async update(pid, { title, tasks, diagram }) {
+    async update(pid, { title, tasks, diagram, spec }) {
       const p = projects.get(pid)
       if (!p) return null
       if (title !== undefined) p.title = title
       if (diagram !== undefined) p.diagram = diagram
+      if (spec !== undefined) p.spec = spec
       if (tasks !== undefined) {
         for (const t of tasksOf(pid)) taskMap.delete(t.id)
         tasks.forEach((t, i) => { const e = fill(t, pid, i); taskMap.set(e.id, e) })
@@ -120,11 +126,53 @@ test('diagram and diagramNodes round-trip create → getProject', async () => {
   assert.deepEqual(got.tasks.map(t => t.diagramNodes), [['api'], []])
 })
 
+test('spec round-trips create → getProject, undeclared entry keys and all', async () => {
+  const svc = makeProjectsService(fakeRepo())
+  const spec = { dataModels: [{ id: 'projectModel', name: 'Project', fields: [{ name: 'spec', type: 'Spec?' }] }] }
+  const p = await svc.createProject({ title: 'P', spec, tasks: [task()] })
+  assert.deepEqual((await svc.getProject(p.id)).spec, spec)
+})
+
+// the point of a field-wise merge: Claude fixes up the spec while the user is mid-review, and the
+// tasks the review screen is live-syncing (ids, done flags) must not be recreated underneath them
+test('a spec-only update leaves the tasks and their ids alone', async () => {
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({ title: 'P', tasks: [task({ title: 'a' }), task({ title: 'b', done: true })] })
+  const updated = await svc.updateProject(p.id, { spec: { api: [{ id: 'putProject' }] } })
+  assert.deepEqual(updated.spec, { api: [{ id: 'putProject' }] })
+  assert.deepEqual(updated.tasks.map(t => t.id), p.tasks.map(t => t.id))
+  assert.deepEqual(updated.tasks.map(t => t.done), [false, true])
+})
+
 test('updateTask can set diagramNodes', async () => {
   const svc = makeProjectsService(fakeRepo())
   const p = await svc.createProject({ title: 'P', tasks: [task()] })
   const t = await svc.updateTask(p.id, p.tasks[0].id, { diagramNodes: ['web', 'db'] })
   assert.deepEqual(t.diagramNodes, ['web', 'db'])
+})
+
+test('specRefs round-trip create → getProject', async () => {
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({
+    title: 'P', tasks: [task({ specRefs: ['taskModel', 'patchTask'] }), task({ title: 'u' })],
+  })
+  const got = await svc.getProject(p.id)
+  assert.deepEqual(got.tasks.map(t => t.specRefs), [['taskModel', 'patchTask'], []])
+})
+
+test('updateTask can set specRefs', async () => {
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({ title: 'P', tasks: [task()] })
+  const t = await svc.updateTask(p.id, p.tasks[0].id, { specRefs: ['projectModel'] })
+  assert.deepEqual(t.specRefs, ['projectModel'])
+})
+
+// a task and its spec are patched independently — flipping done must not touch the refs
+test('a patch of done leaves existing specRefs intact', async () => {
+  const svc = makeProjectsService(fakeRepo())
+  const p = await svc.createProject({ title: 'P', tasks: [task({ specRefs: ['projectModel'] })] })
+  const t = await svc.updateTask(p.id, p.tasks[0].id, { done: true })
+  assert.deepEqual(t.specRefs, ['projectModel'])
 })
 
 test('deleteProject cascades its tasks', async () => {

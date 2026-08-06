@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { parsePlan, planToMarkdown } from '../shared/parse'
-import { api, type CreatedIssue, type ProjectsPage as ProjectsPageData, type ProjectSummary, type ProjectWithTasks, type Team } from './lib/api'
+import { api, type CreatedIssue, type ProjectsPage as ProjectsPageData, type ProjectSummary, type ProjectWithTasks, type Spec, type Team } from './lib/api'
 
 // route-level code splitting (React.lazy + Suspense) while keeping named exports
 const InputPage = lazy(() => import('./pages/InputPage').then(m => ({ default: m.InputPage })))
@@ -24,7 +24,9 @@ export function App() {
   const [taskIds, setTaskIds] = useState<(string | undefined)[]>([])
   const [diagram, setDiagram] = useState('')
   const [seqDiagram, setSeqDiagram] = useState('')
+  const [spec, setSpec] = useState<Spec | null>(null)
   const [taskNodes, setTaskNodes] = useState<string[][]>([]) // diagram node ids per task, index-aligned with tasks
+  const [taskRefs, setTaskRefs] = useState<string[][]>([]) // spec entry ids per task, index-aligned with tasks
   const [projectsPage, setProjectsPage] = useState<ProjectsPageData | null>(null)
   const [page, setPage] = useState(1)
   const [saveError, setSaveError] = useState('')
@@ -35,7 +37,9 @@ export function App() {
   const serverMd = useRef('') // serialized server state; poll re-hydrates only when it changes
 
   const { planTitle, tasks } = useMemo(() => parsePlan(md), [md])
-  const shippable = [...done].sort((a, b) => a - b).map(i => tasks[i]).filter(t => t && t.errors.length === 0)
+  // kept as indices too: a task's spec refs live in `taskRefs`, which is index-aligned with `tasks`
+  const shippableIdx = [...done].sort((a, b) => a - b).filter(i => tasks[i] && tasks[i].errors.length === 0)
+  const shippable = shippableIdx.map(i => tasks[i])
 
   // the one place that maps a saved project onto state — used by both the initial open and the
   // poll, so a newly persisted field can never load in one path and be forgotten in the other
@@ -47,7 +51,9 @@ export function App() {
     setTaskIds(p.tasks.map(t => t.id))
     setDiagram(p.diagram ?? '')
     setSeqDiagram(p.sequenceDiagram ?? '')
+    setSpec(p.spec ?? null)
     setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
+    setTaskRefs(p.tasks.map(t => t.specRefs ?? []))
     setProjectId(p.id)
     syncedDone.current = doneSet
     serverMd.current = fresh
@@ -136,6 +142,7 @@ export function App() {
           title: t.title, problem: t.problem, todo: t.todo, outcome: t.outcome,
           dependsOn: t.dependsOn, done: done.has(i),
           diagramNodes: taskNodes[i] ?? [], // carry nodes through PUT's replace-all-tasks
+          specRefs: taskRefs[i] ?? [], // same — a PUT without these wipes every task's spec refs
         }))
         .filter(t => t !== null)
       const p = projectId
@@ -145,6 +152,7 @@ export function App() {
       setTaskIds(tasks.map(t => (t.errors.length ? undefined : p.tasks[j++]?.id)))
       setDiagram(p.diagram ?? '')
       setSeqDiagram(p.sequenceDiagram ?? '')
+      setSpec(p.spec ?? null)
       syncedDone.current = new Set(done)
       serverMd.current = planToMarkdown(title, p.tasks)
       setProjectId(p.id)
@@ -188,7 +196,7 @@ export function App() {
     setMd(value)
     setDone(new Set()); setCreated([])
     setProjectId(null); setTaskIds([])
-    setDiagram(''); setSeqDiagram(''); setTaskNodes([])
+    setDiagram(''); setSeqDiagram(''); setSpec(null); setTaskNodes([]); setTaskRefs([])
     syncedDone.current = new Set(); serverMd.current = ''
     setSaveError('')
   }
@@ -207,7 +215,9 @@ export function App() {
   async function create() {
     setBusy(true); setError(''); setCreated([])
     try {
-      const data = await api.createIssues(teamId, shippable)
+      // just the tasks: the project spec stays in the app and never rides along to Linear
+      const payload = shippableIdx.map(i => tasks[i])
+      const data = await api.createIssues(teamId, payload)
       setCreated(data.created)
       if (data.relationErrors?.length) setError(`Issues created, but some links failed: ${data.relationErrors.join('; ')}`)
     } catch (e: any) {
@@ -264,7 +274,9 @@ export function App() {
           onShip={() => { setCreated([]); setStep('create') }}
           diagram={diagram}
           seqDiagram={seqDiagram}
+          spec={spec}
           taskNodes={taskNodes}
+          taskRefs={taskRefs}
         />
       ) : (
         <ShipPage

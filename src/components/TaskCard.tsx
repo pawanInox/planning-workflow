@@ -26,7 +26,8 @@ function CopyButton({ label, title, text }: { label: string; title: string; text
   )
 }
 
-// renders both agent-prompt buttons: implement (the implement skill) and review (the code-review skill)
+// renders both agent-prompt buttons: implement (the implement skill) and review (the code-review skill).
+// Neither carries the project spec — a copied prompt is the task's own sections and nothing else.
 export function CopyPromptButton({ task }: { task: Task }) {
   return (<>
     <CopyButton label="🤖 Copy prompt" title="Copy a ready-to-paste prompt for an AI agent to do this task" text={() => taskToPrompt(task)} />
@@ -62,13 +63,17 @@ export const taskMemeQuery = (t: Task) => kindOf(t)[1]
 export const unknownDeps = (t: Task) =>
   new Set(t.warnings.map(w => (w.match(/unknown dependency "(.*)"/) || [])[1]).filter(Boolean))
 
-export function DepChips({ task, resolved }: {
+export function DepChips({ task, resolved, specRefs = [], resolveRef }: {
   task: Task
   resolved?: (dep: string) => { done: boolean; onClick?: () => void } | null
+  /** ids of the spec entries this task implements */
+  specRefs?: string[]
+  /** an id's display name, or null when the spec has no such entry */
+  resolveRef?: (id: string) => string | null
 }) {
   const unknown = unknownDeps(task)
   const deps = task.dependsOn.filter(d => !unknown.has(d.title))
-  if (deps.length === 0 && task.warnings.length === 0) return null
+  if (deps.length === 0 && task.warnings.length === 0 && specRefs.length === 0) return null
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
@@ -87,6 +92,20 @@ export function DepChips({ task, resolved }: {
             </span>
           ) : (
             <span key={d.title} className="pill" title={d.reason} style={style}>⛓ {d.title}</span>
+          )
+        })}
+        {specRefs.map(id => {
+          const name = resolveRef?.(id) ?? null
+          // an id that names nothing is kept ON SCREEN rather than dropped: the API accepts unknown
+          // refs on purpose, so this card is the only place the typo ever surfaces
+          return name ? (
+            <span key={id} className="pill" title={`Spec entry: ${id}`} style={{ color: 'var(--badge-text)', background: 'var(--badge-bg)' }}>
+              📜 {name}
+            </span>
+          ) : (
+            <span key={id} className="pill" title={`No spec entry with id "${id}"`} style={{ color: 'var(--warn)', borderStyle: 'dashed' }}>
+              📜 {id}
+            </span>
           )
         })}
         {task.warnings.map(w => (
@@ -184,12 +203,15 @@ export const TaskSections = memo(function TaskSections({ task, large = false }: 
   </>)
 })
 
-export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect, collapsed, onToggleExpand }: {
+export function TaskCard({ task, index, checked, onToggle, resolveDep, specRefs, resolveRef, onSelect, collapsed, onToggleExpand }: {
   task: Task
   index: number
   checked?: boolean
   onToggle?: () => void
   resolveDep?: (title: string) => { done: boolean } | null
+  specRefs?: string[]
+  resolveRef?: (id: string) => string | null
+  /** the spec entries `specRefs` resolve to — travels with the copied agent prompts */
   onSelect?: () => void
   collapsed: boolean
   onToggleExpand: () => void
@@ -279,7 +301,7 @@ export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect,
           Its single child is what the row height resolves to. */}
       <div className="task-detail" data-closed={collapsed || undefined}>
         <div>
-          <DepChips task={task} resolved={resolveDep} />
+          <DepChips task={task} resolved={resolveDep} specRefs={specRefs} resolveRef={resolveRef} />
           {!hasError && <TaskSections task={task} />}
         </div>
       </div>

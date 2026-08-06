@@ -1,4 +1,4 @@
-import type { NewTask, ProjectRepository, ProjectSummary, ProjectWithTasks, TaskEntity, TaskRepository } from '../../repositories/ports.ts'
+import type { NewProject, NewTask, ProjectPatch, ProjectRepository, ProjectSummary, ProjectWithTasks, TaskEntity, TaskRepository } from '../../repositories/ports.ts'
 
 export type ProjectsPage = {
   items: ProjectSummary[]
@@ -11,10 +11,10 @@ import { NotFoundError } from '../errors.ts'
 
 /** Input shape is validated by `schemas/projects.schema.ts` at the route; this layer holds business rules only. */
 export interface ProjectsService {
-  createProject(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
+  createProject(data: NewProject): Promise<ProjectWithTasks>
   listProjects(paging: { page: number; limit: number }): Promise<ProjectsPage>
   getProject(id: string): Promise<ProjectWithTasks>
-  updateProject(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
+  updateProject(id: string, data: ProjectPatch): Promise<ProjectWithTasks>
   deleteProject(id: string): Promise<void>
   addTask(projectId: string, task: NewTask): Promise<TaskEntity>
   updateTask(projectId: string, taskId: string, patch: Partial<NewTask>): Promise<TaskEntity>

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createProjectSchema, patchTaskSchema } from './projects.schema.ts'
+import type { ZodError } from 'zod'
+import { createProjectSchema, patchTaskSchema, updateProjectSchema } from './projects.schema.ts'
 
 const task = { title: 't', problem: 'p', todo: 'd', outcome: 'o' }
 
@@ -35,8 +36,41 @@ test('create schema accepts diagram and diagramNodes, rejects empty ones', () =>
   assert.throws(() => createProjectSchema.body.parse({ title: 'P', tasks: [{ ...task, diagramNodes: [''] }] }))
 })
 
-// the pitfall: a defaulted diagramNodes here would wipe stored nodes on every {done:true} patch
-test('patch of done does not introduce a diagramNodes key', () => {
-  assert.ok(!('diagramNodes' in patchTaskSchema.body.parse({ done: true })))
+test('create schema keeps spec entry keys it never declared', () => {
+  const spec = { dataModels: [{ id: 'projectModel', name: 'Project', fields: [{ name: 'spec' }] }] }
+  const parsed = createProjectSchema.body.parse({ title: 'P', tasks: [], spec })
+  assert.deepEqual(parsed.spec, spec)
+})
+
+// ids are what a task's specRefs point at, so a repeat makes a ref ambiguous — and sections are
+// open, so the clash is spec-wide rather than per section
+test('create schema rejects a spec that repeats an entry id, naming the second one', () => {
+  const parse = () => createProjectSchema.body.parse({
+    title: 'P', tasks: [],
+    spec: { dataModels: [{ id: 'a' }], api: [{ id: 'a' }] },
+  })
+  assert.throws(parse, (e: ZodError) => {
+    assert.deepEqual(e.issues[0].path, ['spec', 'api', 0, 'id'])
+    assert.match(e.issues[0].message, /duplicate spec entry id 'a'/)
+    return true
+  })
+})
+
+test('create schema rejects a spec entry with no id', () => {
+  assert.throws(() => createProjectSchema.body.parse({ title: 'P', tasks: [], spec: { api: [{ method: 'GET' }] } }))
+  assert.throws(() => createProjectSchema.body.parse({ title: 'P', tasks: [], spec: { api: [{ id: ' ' }] } }))
+})
+
+test('update schema takes a spec on its own', () => {
+  const parsed = updateProjectSchema.body.parse({ spec: { api: [{ id: 'getProject' }] } })
+  assert.deepEqual(parsed, { spec: { api: [{ id: 'getProject' }] } })
+})
+
+// the pitfall: a defaulted diagramNodes/specRefs here would wipe stored values on every {done:true} patch
+test('patch of done does not introduce a diagramNodes or specRefs key', () => {
+  const patched = patchTaskSchema.body.parse({ done: true })
+  assert.ok(!('diagramNodes' in patched))
+  assert.ok(!('specRefs' in patched))
   assert.deepEqual(patchTaskSchema.body.parse({ diagramNodes: ['web'] }), { diagramNodes: ['web'] })
+  assert.deepEqual(patchTaskSchema.body.parse({ specRefs: ['projectModel'] }), { specRefs: ['projectModel'] })
 })

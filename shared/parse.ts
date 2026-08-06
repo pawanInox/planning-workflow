@@ -158,6 +158,11 @@ const depLines = (t: Task) =>
 const sections = (t: Task) =>
   `## Problem\n${t.problem}\n\n## What to do\n${t.todo}\n\n## Expected outcome\n${t.outcome}`
 
+// The project spec stays IN the app: none of the three renderings below carry a `## Spec` block.
+// A task's four sections are the whole contract wherever it travels — a Linear issue, an agent
+// prompt, a review prompt. `specRefs` still drive the review screen (glow, dim, card chips); they
+// just don't follow the task out of the app. Don't reintroduce a spec block in any of these.
+
 export function taskToDescription(t: Task): string {
   const deps = t.dependsOn.length ? `\n\n## Blocked by\n${depLines(t)}` : ''
   return `> 🤖 **For AI agents:** ${AGENT_RULES}\n\n${sections(t)}${deps}`

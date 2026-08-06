@@ -2,7 +2,12 @@ import mongoose, { Schema } from 'mongoose'
 import type { Project } from '../entities.ts'
 
 const projectSchema = new Schema(
-  { title: { type: String, required: true }, diagram: { type: String }, sequenceDiagram: { type: String } },
+  {
+    title: { type: String, required: true },
+    diagram: { type: String },
+    sequenceDiagram: { type: String },
+    // the spec lives in its own collection (`models/specs/spec.model.ts`) — see `SpecModel`
+  },
   { timestamps: true },
 )
 

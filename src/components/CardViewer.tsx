@@ -42,12 +42,16 @@ function Meme({ query, fallback }: { query: string; fallback?: ReactNode }) {
   )
 }
 
-export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
+export function CardViewer({ tasks, done, setDone, onShip, onTopChange, taskRefs = [], resolveRef }: {
   tasks: Task[]
   done: Set<number>
   setDone: Dispatch<SetStateAction<Set<number>>>
   onShip: () => void
   onTopChange?: (index: number | null) => void
+  /** spec entry ids per task, index-aligned with `tasks` */
+  taskRefs?: string[][]
+  resolveRef?: (id: string) => string | null
+  /** a task's resolved spec slice, by task index — carried into the copied agent prompts */
 }) {
   const [queue, setQueue] = useState<number[]>([])
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
@@ -288,6 +292,8 @@ export function CardViewer({ tasks, done, setDone, onShip, onTopChange }: {
                     const di = resolveDepIndex(tasks, dep)
                     return di === -1 ? null : { done: done.has(di), onClick: () => jumpTo(di) }
                   }}
+                  specRefs={taskRefs[taskIdx]}
+                  resolveRef={resolveRef}
                 />
                 {t.errors.length > 0 ? (
                   <p style={{ fontSize: 14, color: 'var(--warn)', margin: 0 }}>

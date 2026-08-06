@@ -12,6 +12,7 @@ const taskSchema = new Schema(
     dependsOn: { type: [new Schema({ title: String, reason: String }, { _id: false })], default: [] },
     done: { type: Boolean, default: false },
     diagramNodes: { type: [String], default: [] },
+    specRefs: { type: [String], default: [] },
   },
   { timestamps: true },
 )
@@ -24,4 +25,5 @@ export const toTask = (d: any): TaskEntity => ({
   dependsOn: (d.dependsOn ?? []).map((x: any) => ({ title: x.title ?? '', reason: x.reason ?? '' })),
   done: d.done,
   diagramNodes: d.diagramNodes ?? [],
+  specRefs: d.specRefs ?? [], // ?? [] so documents written before specRefs existed still map
 })

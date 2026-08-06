@@ -12,8 +12,10 @@ import { TaskCard } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { DiagramPanel } from '../components/DiagramPanel'
+import { SpecPanel, specEntryLabel } from '../components/SpecPanel'
+import type { Spec } from '../lib/api'
 
-export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, seqDiagram = '', taskNodes }: {
+export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [] }: {
   planTitle: string
   tasks: Task[]
   done: Set<number>
@@ -26,19 +28,31 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   onShip: () => void
   diagram: string
   seqDiagram?: string
+  spec?: Spec | null
   taskNodes: string[][]
+  /** spec entry ids per task, index-aligned with `tasks` — the counterpart of `taskNodes` */
+  taskRefs?: string[][]
 }) {
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   // task indices whose detail is open — empty means the list opens as scannable name rows,
   // and it is a set (not one index) so opening a task never closes another
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  // which diagram to render when the project has both; fall back to whichever exists
-  const [diagramKind, setDiagramKind] = useState<'flow' | 'seq'>('flow')
-  const shownDiagram = diagramKind === 'seq' && seqDiagram ? seqDiagram : diagram || seqDiagram
+  // which of flowchart / sequence / spec fills the side column; falls back to whichever exists,
+  // so a project that has only one of the three needs no toggle and never renders an empty panel
+  const [pane, setPane] = useState<'flow' | 'seq' | 'spec'>('flow')
+  const shownDiagram = pane === 'seq' && seqDiagram ? seqDiagram : diagram || seqDiagram
+  const showSpec = spec ? pane === 'spec' || !shownDiagram : false
+  const sideCol = Boolean(shownDiagram || showSpec)
   const active = view === 'focus' ? focusTop : selected
   // independent tracks: no track depends on a task in another, so each can be handed off separately
   const tracks = useMemo(() => groupTasks(tasks), [tasks])
+  // id → display name for the cards' ref chips; a miss is an unknown ref, which they show as such
+  const specNames = useMemo(
+    () => new Map(Object.values(spec ?? {}).flat().map(e => [e.id, specEntryLabel(e)])),
+    [spec],
+  )
+  const resolveRef = (id: string) => specNames.get(id) ?? null
   const renderTask = (i: number) => (
     <TaskCard
       key={i}
@@ -50,13 +64,15 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         return di === -1 ? null : { done: done.has(di) }
       }}
       onToggle={() => setDone(prev => toggled(prev, i))}
-      onSelect={shownDiagram ? () => setSelected(i) : undefined}
+      specRefs={taskRefs[i]}
+      resolveRef={resolveRef}
+      onSelect={sideCol ? () => setSelected(i) : undefined}
       collapsed={!expanded.has(i)}
       onToggleExpand={() => setExpanded(prev => toggled(prev, i))}
     />
   )
   const body = view === 'focus' ? (
-    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
+    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} taskRefs={taskRefs} resolveRef={resolveRef} />
   ) : (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
       <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -83,8 +99,8 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
   </>)
   return (
     <div
-      className={shownDiagram ? 'review-shell' : undefined}
-      style={{ maxWidth: shownDiagram ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}
+      className={sideCol ? 'review-shell' : undefined}
+      style={{ maxWidth: sideCol ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       {/* layout in theme.css (.review-head) — a phone needs it full-bleed, which the inline padding
           could not be overridden to do */}
@@ -106,20 +122,32 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sav
         </div>
       </header>
 
-      {diagram || seqDiagram ? (
+      {sideCol ? (
         <div className="review-split">
           <div className="diagram-col">
-            {diagram && seqDiagram && (
+            {/* only worth a toggle row when there is more than one thing to switch between */}
+            {[diagram, seqDiagram, spec].filter(Boolean).length > 1 && (
               <div className="diagram-toggle" style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                <button className={`btn-ghost${diagramKind === 'flow' ? ' active' : ''}`} onClick={() => setDiagramKind('flow')}>
-                  🗺 Flowchart
-                </button>
-                <button className={`btn-ghost${diagramKind === 'seq' ? ' active' : ''}`} onClick={() => setDiagramKind('seq')}>
-                  ⇄ Sequence
-                </button>
+                {diagram && (
+                  <button className={`btn-ghost${!showSpec && pane !== 'seq' ? ' active' : ''}`} onClick={() => setPane('flow')}>
+                    🗺 Flowchart
+                  </button>
+                )}
+                {seqDiagram && (
+                  <button className={`btn-ghost${!showSpec && pane === 'seq' ? ' active' : ''}`} onClick={() => setPane('seq')}>
+                    ⇄ Sequence
+                  </button>
+                )}
+                {spec && (
+                  <button className={`btn-ghost${showSpec ? ' active' : ''}`} onClick={() => setPane('spec')}>
+                    📜 Spec
+                  </button>
+                )}
               </div>
             )}
-            <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />
+            {showSpec && spec
+              ? <SpecPanel spec={spec} highlightIds={active != null ? taskRefs[active] ?? [] : []} />
+              : <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />}
           </div>
           <div className="task-col" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             {body}

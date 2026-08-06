@@ -595,6 +595,14 @@ h1, h2, .serif { font-family: var(--serif); font-weight: 700; letter-spacing: 0;
   justify-content: safe center; /* center when it fits; align to start when scrollable so the top isn't clipped */
 }
 .diagram-col svg { max-width: 100%; height: auto; }
+/* the Spec tab takes the same slot as .dpanel, but scrolls itself — there is no zoom chrome to pin */
+.diagram-col > .spec-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
 .deck-actions {
   display: flex;
   align-items: center;

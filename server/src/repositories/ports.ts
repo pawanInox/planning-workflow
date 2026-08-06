@@ -1,12 +1,12 @@
-import type { NewTask, Project, ProjectSummary, ProjectWithTasks, TaskEntity } from '../models/entities.ts'
+import type { NewProject, NewTask, Project, ProjectPatch, ProjectSummary, ProjectWithTasks, Spec, TaskEntity } from '../models/entities.ts'
 
 export interface ProjectRepository {
-  create(data: { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks>
+  create(data: NewProject): Promise<ProjectWithTasks>
   /** One page, newest first, plus the overall count so callers can compute page numbers. */
   list(paging: { page: number; limit: number }): Promise<{ items: ProjectSummary[]; total: number }>
   getById(id: string): Promise<ProjectWithTasks | null>
-  /** A `tasks` value replaces all of the project's tasks. */
-  update(id: string, data: { title?: string; tasks?: NewTask[]; diagram?: string; sequenceDiagram?: string }): Promise<ProjectWithTasks | null>
+  /** A `tasks` value replaces all of the project's tasks; every other field merges on its own. */
+  update(id: string, data: ProjectPatch): Promise<ProjectWithTasks | null>
   /** Cascades the project's tasks. */
   delete(id: string): Promise<boolean>
 }
@@ -19,4 +19,4 @@ export interface TaskRepository {
   removeTask(projectId: string, taskId: string): Promise<boolean>
 }
 
-export type { NewTask, Project, ProjectSummary, ProjectWithTasks, TaskEntity }
+export type { NewProject, NewTask, Project, ProjectPatch, ProjectSummary, ProjectWithTasks, Spec, TaskEntity }
