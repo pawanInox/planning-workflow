@@ -15,50 +15,48 @@ This skill chains four skills that live in `~/.agents/skills/` (Claude Code does
 2. **Summarize into a spec with to-spec.** Read and follow `~/.agents/skills/to-spec/SKILL.md` to synthesize the grilled conversation + codebase understanding into a spec — problem statement, solution, extensive user stories, implementation decisions, testing decisions, out of scope. No second interview. Use the repo's existing vocabulary and respect any existing ADRs. Output the spec as prose in the chat; do NOT publish it to any issue tracker — the plan-to-linear app is the tracker in this pipeline.
 3. **Break into tickets with to-tickets.** Read and follow `~/.agents/skills/to-tickets/SKILL.md`: draft tracer-bullet vertical slices with blocking edges (expand–contract for wide refactors). SKIP to-tickets' "quiz the user" step — do NOT ask for approval of the breakdown; proceed straight to the next step. The user reviews tasks in the app and asks Claude for edits afterwards (applied via the task API, see step 7). Do NOT publish to `.scratch/` or a tracker — the tickets feed the next step instead.
 4. **Mint the three project artifacts — flowchart, sequence diagram, spec JSON.** All three in ONE step, because that is what lets their ids line up: mint them separately and the spec ends up naming things the diagrams call something else. The app stores all three and shows a Flowchart / Sequence / Spec toggle on the review screen. Read `~/.agents/skills/mermaid-skill/SKILL.md` and follow it for the two diagrams:
-   - **Flowchart** (`graph TD`): the components and the data flow between them, not the task list. Use short, stable, camelCase node ids (e.g. `web`, `apiServer`, `db`). It is read at a glance beside a task card, so it is a **map, not a call trace** — and mermaid's auto-layout cannot rescue a source that fights it. Author it under these constraints:
-     - **Declare, then connect.** Every node is declared inside a `subgraph`, all subgraphs first, and only then a block of edges. Mermaid places nodes in declaration order, so a node born inside an edge line (`apiServer["Express API"] --> mongo[("MongoDB")]`) lands wherever that edge fell and drags its arrows across the picture.
-     - **Group by tier: one `subgraph` per tier, 2-5 nodes each** — what the user touches, what runs, what stores, what is external. Name them plainly (`subgraph "Client"`). 5-12 nodes overall; more than 12 is a second diagram, not a denser one. Add `direction LR` inside a tier that is wider than it is tall.
-     - **Edge budget: at most one more edge than nodes** (8 nodes → 9 edges max), and never more than 12. Over budget means you are drawing calls, and calls belong in the sequence diagram, which is minted in this same step for exactly that purpose.
+   - **Flowchart** (`graph TD`): the components and the data flow between them, not the task list. Short, stable, camelCase node ids (e.g. `web`, `apiServer`, `db`). Two facts drive every rule below: it is read **at a glance beside a task card**, so it is a map and not a call trace; and it lives in a **narrow, full-height column (about 520px wide)**, so a diagram wider than it is tall forces the reviewer to zoom and pan.
+     - **Group into numbered stages that read top to bottom, and flow left to right inside each stage.** `subgraph "1 · Export"`, `subgraph "2 · Queue and review"`, … each with `direction LR` on its own line. This is the shape that survives the narrow panel: a tall stack of short horizontal chains. Tiers side by side (client | server | data) look tidy in the source and render as a wide sheet with diagonals between the columns.
+     - **Give each stage a title that says what happens there**, not just a layer name — `"2 · Queue and review — nothing runs yet"` earns its space; `"Services"` does not.
+     - **Every node is introduced inside the stage that owns it** — on its own line, or as part of that stage's `-->` chain. Never introduce a node inside an edge that crosses between stages: mermaid places nodes in declaration order, so a node born in a crossing edge lands wherever that edge fell and drags its arrows over everything else.
+     - **A stage holding one node is not a stage.** Mermaid sizes a subgraph to its contents, leaving no room for the title, which then renders clipped or behind the node. Merge it into the neighbouring stage, or leave that node ungrouped at the top level.
+     - **3-5 stages, 2-5 nodes each, 5-12 nodes total.** More than 12 nodes is a second diagram, not a denser one.
+     - **Edge budget: at most one more edge than nodes** (8 nodes → 9 edges max), never more than 12. Over budget means you are drawing calls, and calls belong in the sequence diagram — minted in this same step for exactly that purpose.
+     - **Between stages, one edge.** Consecutive stages are joined by a single arrow carrying the handoff (`reviewed by hand`, `claim queued job`). Many arrows between two groups is the spaghetti this is meant to prevent.
      - **One edge per pair, one direction.** Never draw the response as a second arrow. Never draw a transitive shortcut: given `a --> b --> c`, an extra `a --> c` is banned.
-     - **Collapse a fan-in of arrows that mean the same thing.** Three nodes pointing at one node for the same reason is one edge from the tier that owns them, not three long lines. Two arrows into the same node stay only when they mean different things (a read and a write). A helper used from everywhere (`shared/parse.ts`, a validator, a formatter) is **not a node at all** — it is an `interfaces` entry in the spec.
-     - **At most 3 labelled edges, and 4 words each**, only where the label changes what the arrow means. Method, path and payload live in the spec's `api` entries — an arrow labelled `POST /issues + resolved slice` is spec detail smuggled into a picture.
+     - **Collapse a fan-in of arrows that mean the same thing.** Three nodes pointing at one node for the same reason is one edge from the stage that owns them. Two arrows into the same node survive only when they mean different things (a read and a write). A helper called from everywhere (`shared/parse.ts`, a validator, a formatter) is **not a node at all** — it is an `interfaces` entry in the spec.
+     - **At most 3 labelled edges, 4 words each**, only where the label changes what the arrow means. Method, path and payload live in the spec's `api` entries: an arrow labelled `POST /issues + resolved slice` is spec detail smuggled into a picture.
      - **Node labels are 1-4 words, no file paths, no parenthetical asides.** `apiServer["Express API"]`, never `apiServer["Express API (server/src, validates with Zod)"]`.
-     - **Self-check the source before using it.** Nothing renders a PNG in this pipeline, so the check is structural, on the text: count nodes and edges against the budget; every node sits in a subgraph; no pair connected twice; no transitive shortcut; at most 3 labelled edges. Fix the source and re-validate rather than shipping it and letting the reviewer squint.
+     - **Self-check the source before using it.** Nothing renders a PNG in this pipeline, so the check is structural, on the text: count nodes and edges against the budget; every node sits inside its stage; no stage holds one node; at most one edge between any two stages; no pair connected twice; no transitive shortcut; at most 3 labelled edges. Fix the source and re-validate rather than shipping it and letting the reviewer squint.
 
      ```
-     %% no — 8 nodes, 10 edges, no grouping, nodes born inside edges: mermaid scatters them
+     %% no — nodes born inside crossing edges, no stages, 10 edges for 8 nodes,
+     %% every arrow labelled with spec detail: mermaid scatters this across a wide sheet
      graph TD
        planningSkill["Planning skill (/yak-dai, /yang-mai-sure)"] -->|"POST project + spec + specRefs"| apiServer
        apiServer["Express API (server/src)"] --> mongo[("MongoDB")]
        reviewPage["Review screen"] -->|"GET project (3s poll)"| apiServer
        taskCard -->|"copy prompt / review"| parseShared["shared/parse.ts"]
 
-     %% yes — tiers first, then edges; the helper moved to the spec; labels off the arrows
+     %% yes — numbered stages down the page, LR chains inside them, one arrow per handoff,
+     %% the shared helper moved to the spec, labels only where they change the meaning
      graph TD
-       subgraph "Client"
-         reviewPage["Review screen"]
-         taskCard["Task card"]
-         specPanel["Spec tab"]
-         shipPage["Ship screen"]
+       subgraph "1 · Plan — the skill writes it"
+         direction LR
+         planningSkill["Planning skill"] --> apiServer["Express API"] --> mongo[("MongoDB")]
        end
-       subgraph "Server"
-         apiServer["Express API"]
+       subgraph "2 · Review — one card at a time"
+         direction LR
+         reviewPage["Review screen"] --> taskCard["Task card"]
+         reviewPage --> specPanel["Spec tab"]
        end
-       subgraph "Data"
-         mongo[("MongoDB")]
-       end
-       subgraph "External"
-         planningSkill["Planning skill"]
-         linear["Linear"]
+       subgraph "3 · Ship — approved tasks only"
+         direction LR
+         shipPage["Ship screen"] --> linear["Linear"]
        end
 
-       planningSkill --> apiServer
-       reviewPage --> taskCard
-       reviewPage --> specPanel
-       reviewPage -->|"3s poll"| apiServer
-       shipPage --> apiServer
-       apiServer --> mongo
-       apiServer --> linear
+       mongo -->|"3s poll"| reviewPage
+       taskCard -->|"approved"| shipPage
      ```
    - **Sequence diagram** (`sequenceDiagram`): the main runtime flow(s) through those same components. Declare every participant as `participant <sameCamelCaseId> as <display label>` — participant ids MUST reuse the flowchart's node ids verbatim, because the app highlights both diagrams by those ids (flowchart nodes glow; sequence messages between the task's participants light up while the rest dims).
    - Validate BOTH diagram sources before use (mermaid-skill's validation-first rule — Kroki or local `mmdc`; no PNG export needed).
