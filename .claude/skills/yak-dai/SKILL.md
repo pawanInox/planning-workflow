@@ -15,7 +15,51 @@ This skill chains four skills that live in `~/.agents/skills/` (Claude Code does
 2. **Summarize into a spec with to-spec.** Read and follow `~/.agents/skills/to-spec/SKILL.md` to synthesize the grilled conversation + codebase understanding into a spec — problem statement, solution, extensive user stories, implementation decisions, testing decisions, out of scope. No second interview. Use the repo's existing vocabulary and respect any existing ADRs. Output the spec as prose in the chat; do NOT publish it to any issue tracker — the plan-to-linear app is the tracker in this pipeline.
 3. **Break into tickets with to-tickets.** Read and follow `~/.agents/skills/to-tickets/SKILL.md`: draft tracer-bullet vertical slices with blocking edges (expand–contract for wide refactors). SKIP to-tickets' "quiz the user" step — do NOT ask for approval of the breakdown; proceed straight to the next step. The user reviews tasks in the app and asks Claude for edits afterwards (applied via the task API, see step 7). Do NOT publish to `.scratch/` or a tracker — the tickets feed the next step instead.
 4. **Mint the three project artifacts — flowchart, sequence diagram, spec JSON.** All three in ONE step, because that is what lets their ids line up: mint them separately and the spec ends up naming things the diagrams call something else. The app stores all three and shows a Flowchart / Sequence / Spec toggle on the review screen. Read `~/.agents/skills/mermaid-skill/SKILL.md` and follow it for the two diagrams:
-   - **Flowchart** (`graph TD`): components and data flow, not the task list. Use short, stable, camelCase node ids (e.g. `web`, `apiServer`, `db`).
+   - **Flowchart** (`graph TD`): the components and the data flow between them, not the task list. Use short, stable, camelCase node ids (e.g. `web`, `apiServer`, `db`). It is read at a glance beside a task card, so it is a **map, not a call trace** — and mermaid's auto-layout cannot rescue a source that fights it. Author it under these constraints:
+     - **Declare, then connect.** Every node is declared inside a `subgraph`, all subgraphs first, and only then a block of edges. Mermaid places nodes in declaration order, so a node born inside an edge line (`apiServer["Express API"] --> mongo[("MongoDB")]`) lands wherever that edge fell and drags its arrows across the picture.
+     - **Group by tier: one `subgraph` per tier, 2-5 nodes each** — what the user touches, what runs, what stores, what is external. Name them plainly (`subgraph "Client"`). 5-12 nodes overall; more than 12 is a second diagram, not a denser one. Add `direction LR` inside a tier that is wider than it is tall.
+     - **Edge budget: at most one more edge than nodes** (8 nodes → 9 edges max), and never more than 12. Over budget means you are drawing calls, and calls belong in the sequence diagram, which is minted in this same step for exactly that purpose.
+     - **One edge per pair, one direction.** Never draw the response as a second arrow. Never draw a transitive shortcut: given `a --> b --> c`, an extra `a --> c` is banned.
+     - **Collapse a fan-in of arrows that mean the same thing.** Three nodes pointing at one node for the same reason is one edge from the tier that owns them, not three long lines. Two arrows into the same node stay only when they mean different things (a read and a write). A helper used from everywhere (`shared/parse.ts`, a validator, a formatter) is **not a node at all** — it is an `interfaces` entry in the spec.
+     - **At most 3 labelled edges, and 4 words each**, only where the label changes what the arrow means. Method, path and payload live in the spec's `api` entries — an arrow labelled `POST /issues + resolved slice` is spec detail smuggled into a picture.
+     - **Node labels are 1-4 words, no file paths, no parenthetical asides.** `apiServer["Express API"]`, never `apiServer["Express API (server/src, validates with Zod)"]`.
+     - **Self-check the source before using it.** Nothing renders a PNG in this pipeline, so the check is structural, on the text: count nodes and edges against the budget; every node sits in a subgraph; no pair connected twice; no transitive shortcut; at most 3 labelled edges. Fix the source and re-validate rather than shipping it and letting the reviewer squint.
+
+     ```
+     %% no — 8 nodes, 10 edges, no grouping, nodes born inside edges: mermaid scatters them
+     graph TD
+       planningSkill["Planning skill (/yak-dai, /yang-mai-sure)"] -->|"POST project + spec + specRefs"| apiServer
+       apiServer["Express API (server/src)"] --> mongo[("MongoDB")]
+       reviewPage["Review screen"] -->|"GET project (3s poll)"| apiServer
+       taskCard -->|"copy prompt / review"| parseShared["shared/parse.ts"]
+
+     %% yes — tiers first, then edges; the helper moved to the spec; labels off the arrows
+     graph TD
+       subgraph "Client"
+         reviewPage["Review screen"]
+         taskCard["Task card"]
+         specPanel["Spec tab"]
+         shipPage["Ship screen"]
+       end
+       subgraph "Server"
+         apiServer["Express API"]
+       end
+       subgraph "Data"
+         mongo[("MongoDB")]
+       end
+       subgraph "External"
+         planningSkill["Planning skill"]
+         linear["Linear"]
+       end
+
+       planningSkill --> apiServer
+       reviewPage --> taskCard
+       reviewPage --> specPanel
+       reviewPage -->|"3s poll"| apiServer
+       shipPage --> apiServer
+       apiServer --> mongo
+       apiServer --> linear
+     ```
    - **Sequence diagram** (`sequenceDiagram`): the main runtime flow(s) through those same components. Declare every participant as `participant <sameCamelCaseId> as <display label>` — participant ids MUST reuse the flowchart's node ids verbatim, because the app highlights both diagrams by those ids (flowchart nodes glow; sequence messages between the task's participants light up while the rest dims).
    - Validate BOTH diagram sources before use (mermaid-skill's validation-first rule — Kroki or local `mmdc`; no PNG export needed).
    - **Spec JSON**: the structured extract of the spec's **Implementation Decisions** — schema changes, API contracts, module interfaces. It is a **review-time artifact only**: it never leaves the app, so it is never a substitute for a task's own `### What to do`. A task that reads as "implement the spec entries" is a broken task — spell the work out in the task, and let the spec be the map the reviewer reads alongside it. Shape is `Record<section, Entry[]>`:
@@ -45,7 +89,7 @@ This skill chains four skills that live in `~/.agents/skills/` (Claude Code does
          "response": { "status": "ok", "message": "string", "data": "Project + tasks" },
          "errors": [{ "status": 400, "when": "an entry id repeats anywhere in the spec" }] }
        ```
-   - Then tag every ticket with **both** the flowchart node ids AND the spec entry ids it touches. Either list may be empty — a docs-only ticket touches no node, a pure-refactor ticket may implement no spec entry.
+   - Then tag every ticket with **both** the flowchart node ids AND the spec entry ids it touches. Either list may be empty — a docs-only ticket touches no node, a pure-refactor ticket may implement no spec entry. Tag **node ids only, never a subgraph title**: the review screen glows individual nodes, so a tier name either matches nothing or tints the whole group.
 5. **Render the tickets into the plan format below**, one `## Task:` block per ticket, ordered blockers-first (execution order):
    - Ticket title → `## Task:` title (imperative, unique). Blocking edges → `### Depends on` lines, each with a concrete blocking reason.
    - **Carry over everything the ticket and spec know — nothing from a ticket's description may be dropped.** The ticket's "what to build" and the spec's problem context become `### Problem` (ending with a concrete `Scenario:` line). The spec's implementation decisions for this slice become `### What to do` as detailed concrete steps — and unlike tracker tickets, real file paths, commands, and APIs are REQUIRED here, not avoided: each card doubles as a self-contained agent prompt, so staleness loses to completeness. The ticket's acceptance criteria and demoable behaviour become `### Expected outcome`, ending with `Before:`/`After:` lines replaying the scenario.
