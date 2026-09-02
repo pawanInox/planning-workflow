@@ -16,7 +16,7 @@ Base URL: `http://localhost:3001/api/v1` with `npm run dev`. With `docker compos
 
 Use this to read or edit a user's plan while they review it in the app — the review screen polls every 3 s and reflects external task edits automatically.
 
-**Deep link**: `http://localhost:5173/?project=<id>` opens that project directly in review. After creating a project via `POST /api/v1/projects`, hand the user this URL (the `/yak-dai` skill does this automatically after planning).
+**Deep link**: `http://localhost:5173/?project=<id>` opens that project directly in review. Bare `/` is the marketing homepage (`src/pages/HomePage.tsx`, styles in `src/pages/home.css`, product screenshots in `public/home/`), `/?page=new` the paste screen, `/?page=projects` the saved list. After creating a project via `POST /api/v1/projects`, hand the user this URL (the `/yak-dai` skill does this automatically after planning).
 
 | Method & path | Body | `data` |
 |---|---|---|

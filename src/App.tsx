@@ -7,10 +7,11 @@ const InputPage = lazy(() => import('./pages/InputPage').then(m => ({ default: m
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })))
 const ReviewPage = lazy(() => import('./pages/ReviewPage').then(m => ({ default: m.ReviewPage })))
 const ShipPage = lazy(() => import('./pages/ShipPage').then(m => ({ default: m.ShipPage })))
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })))
 
 export function App() {
   const [md, setMd] = useState('')
-  const [step, setStep] = useState<'input' | 'review' | 'create' | 'projects'>('input')
+  const [step, setStep] = useState<'home' | 'input' | 'review' | 'create' | 'projects'>('home')
   const [cameFrom, setCameFrom] = useState<'input' | 'projects'>('input')
   const [view, setView] = useState<'focus' | 'list'>('focus')
   const [done, setDone] = useState<Set<number>>(new Set())
@@ -59,7 +60,8 @@ export function App() {
     serverMd.current = fresh
   }
 
-  // deep link: /?project=<id> opens that project straight into review, /?page=projects opens the list
+  // deep link: /?project=<id> opens that project straight into review, /?page=projects opens the list,
+  // /?page=new opens the paste screen. Bare / is the homepage.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const pid = params.get('project')
@@ -67,6 +69,7 @@ export function App() {
     else {
       deepLinkPending.current = false
       if (params.get('page') === 'projects') setStep('projects')
+      else if (params.get('page') === 'new') setStep('input')
     }
   }, [])
 
@@ -75,6 +78,7 @@ export function App() {
     const url =
       step === 'projects' ? '/?page=projects'
       : (step === 'review' || step === 'create') && projectId ? `/?project=${projectId}`
+      : step === 'input' ? '/?page=new'
       : '/'
     // a deep link is still resolving — rewriting the URL now would drop the id it carries
     if (deepLinkPending.current) return
@@ -242,13 +246,16 @@ export function App() {
             onClick={() => setOpenError('')}>Dismiss</button>
         </div>
       )}
-      {step === 'input' ? (
+      {step === 'home' ? (
+        <HomePage onOpen={() => setStep('input')} />
+      ) : step === 'input' ? (
         <InputPage
           md={md}
           tasks={tasks}
           hasProjects={(projectsPage?.total ?? 0) > 0 || listError !== ''}
           onMdChange={editMd}
           onShowProjects={() => setStep('projects')}
+          onHome={() => setStep('home')}
           onStartReview={startReview}
         />
       ) : step === 'projects' ? (

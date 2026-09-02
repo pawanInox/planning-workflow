@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yak Dai Tham Eng — demo</title>
+
+<!-- Silkscreen carries every display and HUD moment (the product's pixel chrome).
+     Geist carries reading text, because pixel type does not survive a paragraph. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   FIXED 16:9 STAGE — viewport-base.css, included in full.
+   Slides are authored at 1920x1080 and scaled as one unit.
+   ============================================================ */
+html, body {
+  width: 100%; height: 100%; margin: 0; overflow: hidden;
+  background: var(--stage-bg, #000);
+}
+.deck-viewport { position: fixed; inset: 0; overflow: hidden; background: var(--stage-bg, #000); }
+.deck-stage {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+  overflow: hidden; transform-origin: 0 0; background: var(--slide-bg, #fff);
+}
+.slide {
+  position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
+  display: block; visibility: hidden; opacity: 0; pointer-events: none;
+  background: var(--slide-bg, #fff);
+}
+.slide.active, .slide.visible { visibility: visible; opacity: 1; pointer-events: auto; z-index: 1; }
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.deck-controls { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1000; }
+@media print {
+  html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+  .deck-viewport { position: static; overflow: visible; background: #fff; }
+  .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+  .slide {
+    position: relative; display: block !important; visibility: visible !important;
+    opacity: 1 !important; pointer-events: auto !important;
+    width: 1920px; height: 1080px; break-after: page; page-break-after: always;
+  }
+  .slide:last-child { break-after: auto; page-break-after: auto; }
+  .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* ============================================================
+   QUEST LOG — the product's own chrome as a deck.
+   Every value below is a token: change these to restyle the deck.
+   ============================================================ */
+:root {
+  --stage-bg:#1a130c;   /* letterbox around the stage */
+  --slide-bg:#cdb891;   /* sun-baked sand: the field */
+  --parch:#efe3c6;      /* parchment: every panel */
+  --wood:#5c3f22;       /* chunky border brown */
+  --ink:#33240f;        /* bark ink */
+  --mut:#74573a;        /* muted ink, passes AA on parchment */
+  --amber:#a4560a;      /* burnt amber: the signal colour */
+  --amber-lit:#e0a94c;  /* lit amber, for dark panels */
+  --moss:#4a6327;       /* approve green */
+  --rust:#a23b28;       /* problem */
+  --pine:#3f6b5e;       /* what to do */
+  --ochre:#8a6a1f;      /* expected outcome */
+  --dark:#2b1f13;       /* inverted panel */
+  --pixel:'Silkscreen', ui-monospace, monospace;
+  --body:'Geist', -apple-system, system-ui, sans-serif;
+  --mono:'Geist Mono', ui-monospace, monospace;
+  --hard:14px 14px 0 rgba(58,42,24,.34);   /* no-blur pixel shadow */
+  --hard-sm:8px 8px 0 rgba(58,42,24,.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* the field: the app's 6px dither, scaled up so a projector can see it */
+.slide {
+  font-family: var(--body); color: var(--ink);
+  background-image: linear-gradient(45deg,
+    rgba(92,63,34,.16) 25%, transparent 25%, transparent 75%, rgba(92,63,34,.16) 75%);
+  background-size: 12px 12px;
+}
+/* inverted slides for the section beats */
+.slide.dark {
+  background: var(--dark); color: var(--parch);
+  background-image: linear-gradient(45deg,
+    rgba(255,255,255,.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.05) 75%);
+  background-size: 12px 12px;
+}
+
+/* ============================================================
+   PANELS — one component, hard edges, offset shadow, no blur
+   ============================================================ */
+/* z-index 1 keeps every real surface above the ghost slide number */
+.panel, .mat, .wall, .copy, .stmt, .head, .tones, .foot, .flow, .note, .pair, .made, .mid, .steps {
+  position: relative; z-index: 1;
+}
+.panel {
+  background: var(--parch);
+  border: 5px solid var(--wood);
+  box-shadow: var(--hard);
+}
+.slide.dark .panel { background: #3a2a1a; border-color: #7a5a34; color: var(--parch); }
+
+/* ============================================================
+   HUD — every slide wears the same top bar: chip, count, XP bar
+   ============================================================ */
+.hud { position: absolute; left: 110px; top: 90px; right: 110px; display: flex; align-items: center; gap: 24px; }
+.hud .chip {
+  font-family: var(--pixel); font-size: 22px; letter-spacing: .04em;
+  background: var(--wood); color: var(--parch); padding: 16px 26px;
+}
+.slide.dark .hud .chip { background: var(--amber-lit); color: var(--dark); }
+.hud .lvl { font-family: var(--pixel); font-size: 22px; color: var(--wood); }
+.slide.dark .hud .lvl { color: var(--amber-lit); }
+.hud .bar { flex: 1; height: 26px; border: 4px solid var(--wood); background: rgba(92,63,34,.22); overflow: hidden; }
+.slide.dark .hud .bar { border-color: #7a5a34; background: rgba(255,255,255,.08); }
+.hud .bar i {
+  display: block; height: 100%;
+  background: repeating-linear-gradient(90deg, var(--moss) 0 16px, transparent 16px 20px), var(--moss);
+  background-blend-mode: overlay;
+}
+.slide.dark .hud .bar i {
+  background: repeating-linear-gradient(90deg, #8bad52 0 16px, transparent 16px 20px), #8bad52;
+}
+
+/* the giant ghost slide number, bottom right */
+.no {
+  position: absolute; right: 104px; bottom: 62px; z-index: 0;
+  font-family: var(--pixel); font-size: 150px; line-height: 1;
+  color: rgba(58,42,24,.15); user-select: none;
+}
+.slide.dark .no { color: rgba(255,255,255,.08); }
+
+/* ============================================================
+   TYPE ROLES
+   ============================================================ */
+h1 { font-family: var(--pixel); font-size: 104px; line-height: 1.14; letter-spacing: -.01em; font-weight: 400; }
+h2 { font-family: var(--pixel); font-size: 62px; line-height: 1.2; font-weight: 400; }
+h3 { font-family: var(--pixel); font-size: 30px; line-height: 1.3; font-weight: 400; }
+.amber { color: var(--amber); }
+.slide.dark .amber { color: var(--amber-lit); }
+.lead { font-size: 37px; line-height: 1.5; color: var(--mut); }
+.slide.dark .lead { color: #c3ab86; }
+.body-t { font-size: 30px; line-height: 1.55; color: var(--mut); }
+.slide.dark .body-t { color: #c3ab86; }
+.quest {
+  font-family: var(--pixel); font-size: 24px; letter-spacing: .06em;
+  color: var(--parch); background: var(--moss); padding: 14px 22px; display: inline-block;
+}
+.cap { font-family: var(--pixel); font-size: 20px; color: var(--wood); letter-spacing: .04em; }
+
+/* pixel button, with a real press */
+.btn {
+  display: inline-block; font-family: var(--pixel); font-size: 24px;
+  background: var(--amber); color: #fdf3e0; border: 5px solid var(--wood);
+  padding: 20px 34px; box-shadow: var(--hard-sm);
+}
+.btn.moss { background: var(--moss); }
+
+/* ============================================================
+   SLIDE 1 — TITLE
+   ============================================================ */
+.s-title .card { position: absolute; left: 110px; top: 216px; width: 1080px; padding: 70px 74px; }
+.s-title h1 { margin: 44px 0 0; }
+.s-title .lead { margin: 44px 0 0; max-width: 900px; }
+.s-title .tones { position: absolute; left: 1290px; top: 216px; width: 520px; display: flex; flex-direction: column; gap: 22px; }
+.tone { background: var(--parch); border: 5px solid var(--wood); border-left: 22px solid var(--rust); padding: 30px 34px; box-shadow: 12px 12px 0 rgba(58,42,24,.3); }
+.tone.pine { border-left-color: var(--pine); }
+.tone.ochre { border-left-color: var(--ochre); }
+.tone span { font-family: var(--pixel); font-size: 19px; letter-spacing: .06em; color: var(--rust); }
+.tone.pine span { color: var(--pine); }
+.tone.ochre span { color: var(--ochre); }
+.tone b { display: block; font-size: 29px; font-weight: 600; margin-top: 12px; }
+.s-title .foot { position: absolute; left: 110px; bottom: 92px; display: flex; align-items: center; gap: 22px; }
+.s-title .hint { font-family: var(--pixel); font-size: 19px; color: var(--wood); }
+
+/* ============================================================
+   SLIDE 2 — THE PROBLEM (statement + the markdown wall prop)
+   ============================================================ */
+.s-problem .stmt { position: absolute; left: 110px; top: 260px; width: 1000px; }
+.s-problem h2 { font-size: 74px; }
+.s-problem .lead { margin-top: 46px; max-width: 900px; }
+.wall {
+  position: absolute; right: 120px; top: 210px; width: 620px; bottom: 170px;
+  background: var(--parch); border: 5px solid var(--wood); padding: 40px 44px;
+  font-family: var(--mono); font-size: 19px; line-height: 1.95; color: var(--mut);
+  overflow: hidden; box-shadow: var(--hard);
+}
+.wall::after { content: ''; position: absolute; inset: auto 0 0 0; height: 42%; background: linear-gradient(transparent, var(--parch)); }
+
+/* ============================================================
+   SLIDE 3 — THE PIPELINE (three pills)
+   ============================================================ */
+.s-pipe .stmt { position: absolute; left: 110px; top: 250px; width: 1400px; }
+.s-pipe .flow { position: absolute; left: 110px; top: 520px; right: 110px; display: flex; align-items: center; gap: 30px; }
+.fpill {
+  background: var(--parch); border: 5px solid var(--wood); box-shadow: var(--hard-sm);
+  padding: 34px 44px; font-family: var(--pixel); font-size: 34px; white-space: nowrap;
+}
+.fpill.amber { background: var(--amber); color: #fdf3e0; }
+.fpill.moss { background: var(--moss); color: #f3f0dc; }
+.farrow { font-family: var(--pixel); font-size: 40px; color: var(--amber); }
+.s-pipe .note { position: absolute; left: 110px; top: 700px; width: 1300px; }
+
+/* ============================================================
+   SLIDE 4 — THE TWO PLANNING SKILLS
+   ============================================================ */
+.s-skills .head { position: absolute; left: 110px; top: 220px; width: 1500px; }
+.s-skills .pair { position: absolute; left: 110px; top: 420px; right: 110px; display: flex; gap: 34px; }
+.s-skills .sk { flex: 1; padding: 46px 50px; }
+.s-skills .cmd { font-family: var(--pixel); font-size: 34px; color: var(--amber); }
+.s-skills .sk h3 { margin: 26px 0 0; }
+.s-skills .sk p { margin: 22px 0 0; font-size: 27px; line-height: 1.55; color: var(--mut); }
+.s-skills .made { position: absolute; left: 110px; bottom: 130px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.tagx { font-family: var(--pixel); font-size: 20px; background: var(--wood); color: var(--parch); padding: 13px 20px; }
+
+/* ============================================================
+   SHOT SLIDES — a screenshot on its own parchment mat
+   ============================================================ */
+.mat { background: var(--parch); border: 5px solid var(--wood); padding: 14px; box-shadow: var(--hard); }
+.mat img { display: block; width: 100%; height: auto; }
+
+.s-shot .copy { position: absolute; left: 110px; top: 250px; width: 620px; }
+.s-shot .copy h2 { font-size: 54px; }
+.s-shot .copy .body-t { margin-top: 34px; }
+.s-shot .copy .quest { margin-bottom: 30px; }
+.s-shot .mat { position: absolute; left: 800px; top: 200px; width: 1010px; }
+.s-shot.flip .copy { left: 1190px; width: 620px; }
+.s-shot.flip .mat { left: 110px; }
+
+/* slide 6: two portrait panels side by side */
+.s-twin .head { position: absolute; left: 110px; top: 200px; width: 1400px; }
+/* bottom-aligned so the two different portrait heights read as deliberate, not misaligned.
+   Widths are chosen so the TALLER shot lands inside 1080: 480 wide -> 571 tall. */
+.s-twin .pair { position: absolute; left: 110px; top: 390px; right: 110px; display: flex; gap: 34px; align-items: flex-end; }
+.s-twin .cell { display: flex; flex-direction: column; gap: 16px; }
+.s-twin .cell.a { width: 500px; }
+.s-twin .cell.b { width: 420px; }
+.s-twin .cell.note { width: 560px; padding-bottom: 46px; }
+.s-twin .cell .cap { text-align: center; }
+
+
+
+/* ============================================================
+   SLIDE 8 — CLOSING
+   ============================================================ */
+.s-end .mid { position: absolute; left: 110px; top: 250px; width: 1500px; }
+.s-end h1 { font-size: 88px; }
+.s-end .lead { margin-top: 44px; max-width: 1100px; }
+.s-end .steps { position: absolute; left: 110px; top: 640px; display: flex; flex-direction: column; gap: 24px; }
+.s-end .step { display: flex; align-items: center; gap: 24px; }
+.s-end .step .k { font-family: var(--pixel); font-size: 22px; background: var(--amber-lit); color: var(--dark); padding: 14px 20px; width: 300px; text-align: center; }
+.s-end .step .v { font-family: var(--mono); font-size: 28px; color: #c3ab86; }
+.s-end .foot { position: absolute; left: 110px; bottom: 110px; display: flex; gap: 22px; align-items: center; }
+
+/* ============================================================
+   MOTION — one orchestrated load per slide. Panels land like
+   dealt cards: a short overshoot, no blur, no drift.
+   ============================================================ */
+.r { opacity: 0; transform: translate(-18px, 22px); }
+.slide.visible .r { animation: land .5s cubic-bezier(.34,1.56,.64,1) forwards; }
+.slide.visible .r:nth-child(1) { animation-delay: .04s }
+.slide.visible .r:nth-child(2) { animation-delay: .12s }
+.slide.visible .r:nth-child(3) { animation-delay: .22s }
+.slide.visible .r:nth-child(4) { animation-delay: .32s }
+.slide.visible .r:nth-child(5) { animation-delay: .42s }
+.slide.visible .r:nth-child(6) { animation-delay: .52s }
+@keyframes land { to { opacity: 1; transform: none; } }
+/* the XP bar fills in discrete blocks, like the app's own progress */
+.hud .bar i { width: 0; }
+.slide.visible .hud .bar i { animation: fill 1s .35s steps(9, end) forwards; }
+@keyframes fill { to { width: var(--pct, 0%); } }
+
+/* ============================================================
+   DECK CHROME — outside the stage, so it never scales with it
+   ============================================================ */
+.deck-controls { display: flex; align-items: center; gap: 16px; }
+.pdots { display: flex; gap: 9px; }
+.pdot { width: 11px; height: 11px; border: 2px solid #b39b74; background: transparent; padding: 0; cursor: pointer; }
+.pdot.on { background: var(--amber-lit); border-color: var(--amber-lit); width: 26px; }
+#pagenum { font-family: var(--pixel); font-size: 14px; color: #b39b74; }
+
+/* inline editing chrome (hover the top-left corner, or press E) */
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+.edit-toggle {
+  position: fixed; top: 16px; left: 16px; z-index: 10001;
+  font-size: 20px; line-height: 1; padding: 10px 12px; cursor: pointer;
+  background: var(--parch); border: 3px solid var(--wood); color: var(--ink);
+  opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--amber); color: #fdf3e0; }
+body.editing [contenteditable] { outline: 3px dashed var(--amber); outline-offset: 4px; }
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<div class="deck-stage" id="deckStage">
+
+  <!-- ============ SLIDE 1 — TITLE ============ -->
+  <section class="slide s-title active">
+    <div class="hud r">
+      <span class="chip">QUEST LOG</span>
+      <span class="lvl">01 / 08</span>
+      <span class="bar" style="--pct:12%"><i></i></span>
+    </div>
+    <div class="panel card r">
+      <span class="quest">QUEST 01/08</span>
+      <h1>Yak Dai<br><span class="amber">Tham Eng</span></h1>
+      <p class="lead">A plan review that sits between the agent that writes the plan and the tracker that holds the work.</p>
+    </div>
+    <div class="tones r">
+      <div class="tone"><span>PROBLEM</span><b>Why the task exists</b></div>
+      <div class="tone pine"><span>WHAT TO DO</span><b>The concrete steps</b></div>
+      <div class="tone ochre"><span>EXPECTED OUTCOME</span><b>How you know it worked</b></div>
+    </div>
+    <div class="foot r">
+      <span class="btn">&#9654; START</span>
+      <span class="hint">arrow keys to move through the deck</span>
+    </div>
+    <p class="no">01</p>
+  </section>
+
+  <!-- ============ SLIDE 2 — THE PROBLEM ============ -->
+  <section class="slide s-problem">
+    <div class="hud r">
+      <span class="chip">THE PROBLEM</span>
+      <span class="lvl">02 / 08</span>
+      <span class="bar" style="--pct:25%"><i></i></span>
+    </div>
+    <div class="stmt r">
+      <h2>An agent writes<br>the plan in <span class="amber">seconds.</span><br>Nobody reads it.</h2>
+      <p class="lead">It arrives as one long markdown file. You skim the headings, trust it, and find out what was wrong three days into the work.</p>
+    </div>
+    <div class="wall r">
+# Plan: Ship the v1 mobile app<br><br>
+## Task: Set up iOS release signing<br>
+### Problem<br>
+Release builds are signed from one laptop,<br>so nobody else can cut a build.<br>
+### What to do<br>
+Create a distribution certificate in the<br>shared Apple team, store it with<br>`fastlane match`, put the API key in CI.<br>
+### Expected outcome<br>
+Any CI runner can sign a release build.<br><br>
+## Task: Add the iOS release lane to CI<br>
+### Problem<br>
+iOS archives are produced by hand, so a<br>shipped binary depends on whatever Xcode<br>that laptop had.<br>
+### What to do<br>
+Add a `release_ios` lane in the Fastfile<br>that fetches certificates, sets the build<br>number from the CI run, then uploads.<br>
+### Expected outcome<br>
+Pushing a tag produces a signed build.
+    </div>
+    <p class="no">02</p>
+  </section>
+
+  <!-- ============ SLIDE 3 — THE PIPELINE ============ -->
+  <section class="slide s-pipe">
+    <div class="hud r">
+      <span class="chip">THE SHAPE OF IT</span>
+      <span class="lvl">03 / 08</span>
+      <span class="bar" style="--pct:37%"><i></i></span>
+    </div>
+    <div class="stmt r">
+      <h2>Three passes, and the<br>plan is <span class="amber">tickets.</span></h2>
+    </div>
+    <div class="flow r">
+      <span class="fpill amber">PLAN</span>
+      <span class="farrow">&#9654;</span>
+      <span class="fpill">REVIEW</span>
+      <span class="farrow">&#9654;</span>
+      <span class="fpill moss">SHIP</span>
+    </div>
+    <div class="note r">
+      <p class="lead">A skill writes the plan and creates the project. You read it one card at a time and approve or skip. What you approved becomes Linear issues, dependencies and all.</p>
+    </div>
+    <p class="no">03</p>
+  </section>
+
+  <!-- ============ SLIDE 4 — THE PLANNING SKILLS ============ -->
+  <section class="slide s-skills">
+    <div class="hud r">
+      <span class="chip">PLANNING</span>
+      <span class="lvl">04 / 08</span>
+      <span class="bar" style="--pct:50%"><i></i></span>
+    </div>
+    <div class="head r">
+      <h2>The plan can <span class="amber">write itself.</span></h2>
+    </div>
+    <div class="pair r">
+      <div class="panel sk">
+        <p class="cmd">/yak-dai</p>
+        <h3>When you know<br>what you want</h3>
+        <p>It interviews you, turns the answers into a spec, then into tickets, and creates the project here.</p>
+      </div>
+      <div class="panel sk">
+        <p class="cmd">/yang-mai-sure</p>
+        <h3>When you do<br>not know yet</h3>
+        <p>Too foggy for one sitting. It charts investigation tickets first and works them until the way is clear.</p>
+      </div>
+    </div>
+    <div class="made r">
+      <span class="cap">BOTH WRITE:</span>
+      <span class="tagx">FLOWCHART</span>
+      <span class="tagx">SEQUENCE DIAGRAM</span>
+      <span class="tagx">SPEC JSON</span>
+      <span class="tagx">TAGGED TASKS</span>
+    </div>
+    <p class="no">04</p>
+  </section>
+
+  <!-- ============ SLIDE 5 — THE REVIEW DECK ============ -->
+  <section class="slide s-shot">
+    <div class="hud r">
+      <span class="chip">THE REVIEW</span>
+      <span class="lvl">05 / 08</span>
+      <span class="bar" style="--pct:62%"><i></i></span>
+    </div>
+    <div class="copy r">
+      <span class="quest">ONE AT A TIME</span>
+      <h2>Drag right to<br>approve. Left<br>to skip.</h2>
+      <p class="body-t">Every card repeats its own context, so whoever picks the task up needs nothing else open. Arrow keys work too, and z undoes.</p>
+    </div>
+    <div class="mat r">
+      <img src="assets/card.jpg" alt="A task card in the review deck: problem, what to do, expected outcome">
+    </div>
+    <p class="no">05</p>
+  </section>
+
+  <!-- ============ SLIDE 6 — DIAGRAM + SPEC ============ -->
+  <section class="slide s-twin">
+    <div class="hud r">
+      <span class="chip">BESIDE THE TASK</span>
+      <span class="lvl">06 / 08</span>
+      <span class="bar" style="--pct:75%"><i></i></span>
+    </div>
+    <div class="head r">
+      <h2>The architecture and the spec,<br>right <span class="amber">next to it.</span></h2>
+    </div>
+    <div class="pair r">
+      <div class="cell a">
+        <div class="mat"><img src="assets/flow.jpg" alt="The flowchart panel showing a release pipeline"></div>
+        <p class="cap">FLOWCHART</p>
+      </div>
+      <div class="cell b">
+        <div class="mat"><img src="assets/spec.jpg" alt="The spec panel listing data models"></div>
+        <p class="cap">SPEC</p>
+      </div>
+      <div class="cell note">
+        <p class="body-t">Pick a task and it lights up the nodes and spec entries that task touches, and dims the rest.</p>
+      </div>
+    </div>
+    <p class="no">06</p>
+  </section>
+
+  <!-- ============ SLIDE 7 — TRACKS AND SHIPPING ============ -->
+  <section class="slide s-shot flip">
+    <div class="hud r">
+      <span class="chip">SHIPPING</span>
+      <span class="lvl">07 / 08</span>
+      <span class="bar" style="--pct:87%"><i></i></span>
+    </div>
+    <div class="copy r">
+      <span class="quest">IN PARALLEL</span>
+      <h2>Independent<br>tracks, then<br>Linear.</h2>
+      <p class="body-t">Tasks that do not block each other are split into tracks, so two people can start at once. Shipping carries those links into the issues.</p>
+    </div>
+    <div class="mat r">
+      <img src="assets/tracks.jpg" alt="The list view grouped into three independent tracks of tasks">
+    </div>
+    <p class="no">07</p>
+  </section>
+
+  <!-- ============ SLIDE 8 — CLOSING ============ -->
+  <section class="slide dark s-end">
+    <div class="hud r">
+      <span class="chip">YOUR TURN</span>
+      <span class="lvl">08 / 08</span>
+      <span class="bar" style="--pct:100%"><i></i></span>
+    </div>
+    <div class="mid r">
+      <h1>Bring a plan.</h1>
+      <p class="lead">Run the skill on something you were going to write up by hand anyway, and review the result instead of the markdown.</p>
+    </div>
+    <div class="steps r">
+      <div class="step"><span class="k">IN CLAUDE CODE</span><span class="v">/yak-dai</span></div>
+      <div class="step"><span class="k">NOT SURE YET</span><span class="v">/yang-mai-sure</span></div>
+      <div class="step"><span class="k">ALREADY WROTE IT</span><span class="v">paste the markdown</span></div>
+    </div>
+    <div class="foot r">
+      <span class="btn moss">&#10003; OPEN THE APP</span>
+      <span class="hint" style="color:#c3ab86">localhost:5173</span>
+    </div>
+    <p class="no">08</p>
+  </section>
+
+</div><!-- /deck-stage -->
+</div><!-- /deck-viewport -->
+
+<!-- presentation chrome, deliberately outside the scaled stage -->
+<nav class="deck-controls" aria-label="Slide navigation">
+  <div class="pdots" id="dots"></div>
+  <span id="pagenum">1 / 8</span>
+</nav>
+
+<div class="edit-hotzone" aria-hidden="true"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">&#9998;</button>
+
+<script>
+/* ============================================================
+   SLIDE CONTROLLER — keys, wheel, swipe, dots, stage scaling.
+   ============================================================ */
+class SlidePresentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')]
+    this.stage = document.getElementById('deckStage')
+    this.current = 0
+    this.scaleStage(); this.buildDots(); this.bindKeys(); this.bindTouch(); this.bindWheel()
+    this.show(0)
+  }
+  /* the whole 1920x1080 canvas is scaled by ONE transform — never reflowed */
+  scaleStage() {
+    const fit = () => {
+      const k = Math.min(innerWidth / 1920, innerHeight / 1080)
+      this.stage.style.transform =
+        `translate(${(innerWidth - 1920 * k) / 2}px, ${(innerHeight - 1080 * k) / 2}px) scale(${k})`
+    }
+    fit(); addEventListener('resize', fit)
+  }
+  buildDots() {
+    const nav = document.getElementById('dots')
+    this.dots = this.slides.map((_, i) => {
+      const b = document.createElement('button')
+      b.className = 'pdot'; b.setAttribute('aria-label', `Go to slide ${i + 1}`)
+      b.onclick = () => this.show(i); nav.appendChild(b); return b
+    })
+  }
+  bindKeys() {
+    addEventListener('keydown', e => {
+      if (e.target.getAttribute && e.target.getAttribute('contenteditable')) return
+      if (['ArrowRight', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); this.next() }
+      if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); this.prev() }
+      if (e.key === 'Home') this.show(0)
+      if (e.key === 'End') this.show(this.slides.length - 1)
+    })
+  }
+  bindTouch() {
+    let x0 = null
+    addEventListener('touchstart', e => x0 = e.touches[0].clientX, { passive: true })
+    addEventListener('touchend', e => {
+      if (x0 === null) return
+      const dx = e.changedTouches[0].clientX - x0
+      if (Math.abs(dx) > 60) dx < 0 ? this.next() : this.prev()
+      x0 = null
+    }, { passive: true })
+  }
+  bindWheel() {
+    let lock = false
+    addEventListener('wheel', e => {
+      if (lock || document.body.classList.contains('editing')) return
+      if (Math.abs(e.deltaY) < 25) return
+      lock = true; setTimeout(() => lock = false, 650)
+      e.deltaY > 0 ? this.next() : this.prev()
+    }, { passive: true })
+  }
+  next() { this.show(this.current + 1) }
+  prev() { this.show(this.current - 1) }
+  show(i) {
+    this.current = Math.max(0, Math.min(i, this.slides.length - 1))
+    /* .visible is what arms the reveal animations, so re-entering a slide replays them */
+    this.slides.forEach((s, j) => {
+      s.classList.toggle('active', j === this.current)
+      s.classList.toggle('visible', j === this.current)
+    })
+    this.dots.forEach((d, j) => d.classList.toggle('on', j === this.current))
+    document.getElementById('pagenum').textContent = `${this.current + 1} / ${this.slides.length}`
+  }
+}
+const deck = new SlidePresentation()
+
+/* ============================================================
+   INLINE EDITING — hover the top-left corner or press E.
+   Edits persist in localStorage; Ctrl+S downloads the file.
+   ============================================================ */
+class Editor {
+  constructor() {
+    this.isActive = false
+    this.restore()
+    addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); this.download() }
+    })
+  }
+  targets() {
+    return [...document.querySelectorAll('.slide h1, .slide h2, .slide h3, .slide p, .slide span, .slide b')]
+      .filter(el => !el.querySelector('*'))
+  }
+  toggle() {
+    this.isActive = !this.isActive
+    document.body.classList.toggle('editing', this.isActive)
+    document.getElementById('editToggle').classList.toggle('active', this.isActive)
+    this.targets().forEach(el => {
+      el.contentEditable = this.isActive
+      if (this.isActive) el.oninput = () => this.save()
+    })
+  }
+  key(el) { return [...document.querySelectorAll('.slide')].indexOf(el.closest('.slide')) + ':' + this.targets().indexOf(el) }
+  save() {
+    const data = {}
+    this.targets().forEach(el => data[this.key(el)] = el.innerHTML)
+    localStorage.setItem('yakdai-demo-deck', JSON.stringify(data))
+  }
+  restore() {
+    const raw = localStorage.getItem('yakdai-demo-deck')
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw)
+      this.targets().forEach(el => { const v = data[this.key(el)]; if (v != null) el.innerHTML = v })
+    } catch { /* a corrupted draft should never blank the deck */ }
+  }
+  download() {
+    const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+    a.download = 'yak-dai-demo.html'; a.click(); URL.revokeObjectURL(a.href)
+  }
+}
+const editor = new Editor()
+
+/* three ways in: the button, the corner hotzone, the E key */
+const hotzone = document.querySelector('.edit-hotzone')
+const editToggle = document.getElementById('editToggle')
+let hideTimeout = null
+const showBtn = () => { clearTimeout(hideTimeout); editToggle.classList.add('show') }
+const hideBtn = () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show') }, 400) }
+hotzone.addEventListener('mouseenter', showBtn)
+hotzone.addEventListener('mouseleave', hideBtn)
+editToggle.addEventListener('mouseenter', showBtn)
+editToggle.addEventListener('mouseleave', hideBtn)
+editToggle.addEventListener('click', () => editor.toggle())
+hotzone.addEventListener('click', () => editor.toggle())
+addEventListener('keydown', e => {
+  if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) editor.toggle()
+})
+</script>
+</body>
+</html>

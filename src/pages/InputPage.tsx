@@ -29,13 +29,14 @@ Here is the plan to reformat:
 
 `
 
-export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, onStartReview }: {
+export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, onStartReview, onHome }: {
   md: string
   tasks: Task[]
   hasProjects: boolean
   onMdChange: (value: string) => void
   onShowProjects: () => void
   onStartReview: () => void
+  onHome: () => void
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -50,6 +51,7 @@ export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, 
       <span className="blob" style={{ width: 340, height: 340, top: -90, right: -70, background: 'var(--accent)' }} />
       <span className="blob" style={{ width: 260, height: 260, bottom: -60, left: -80, background: 'var(--card-hue-1)' }} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 16 }}>
+        <button className="btn-ghost" style={{ marginRight: 'auto' }} onClick={onHome}>← Home</button>
         {hasProjects && (
           <button className="btn-ghost" onClick={onShowProjects}>📁 Projects</button>
         )}

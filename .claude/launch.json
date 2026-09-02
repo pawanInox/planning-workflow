@@ -32,6 +32,19 @@
         "--strictPort"
       ],
       "port": 5199
+    },
+    {
+      "name": "home-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "API_ORIGIN=http://localhost:5173",
+        "npx",
+        "vite",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
     }
   ]
 }

@@ -1,0 +1,726 @@
+/* ============================================================
+   HOMEPAGE — cream-and-charcoal marketing surface in front of the
+   app's parchment quest log. Scoped entirely to `.home`, so nothing
+   here can leak into the product screens.
+
+   Locks (keep these if you edit):
+   - one accent hue (amber), which is also the app's own accent
+   - radius rule: controls and chips are pills, big cards 26px,
+     small cards 16px. Nothing else.
+   - display type is BOLD and tight; body type is regular and calm
+   - dark blocks are full-bleed sections, never a lone dark card
+   ============================================================ */
+
+/* ponytail: Google-hosted for now — self-host (@fontsource) before this page ships to production.
+   It rides the lazy HomePage chunk, so the app's other screens never pay for it. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap');
+
+.home {
+  --cream: #f6f3ec;
+  --cream-2: #efeade;
+  --white: #ffffff;
+  --ink: #2c2c2e;
+  --ink-soft: #5f5f64;
+  --line: #e2ddd0;
+  --line-strong: #8a8779; /* control borders — a hairline alone fails WCAG 1.4.11 */
+
+  --dark: #1d1d1f;
+  --dark-2: #292a2c;
+  --dark-line: rgb(255 255 255 / 0.1);
+  --on-dark: #f3f1ea;
+  --on-dark-soft: #a8a8ad;
+
+  --amber: #f59e0b;      /* chips and rules only: too light to carry text on cream */
+  --amber-ink: #a4560a;  /* the text-safe shade */
+
+  --pill: 999px;
+  --r-lg: 26px;
+  --r: 16px;
+  --r-sm: 12px;
+
+  --shadow-sm: 0 10px 30px -20px rgb(46 42 34 / 0.4);
+  --shadow-md: 0 20px 50px -28px rgb(46 42 34 / 0.45);
+  --shadow-lg: 0 40px 90px -40px rgb(46 42 34 / 0.55);
+
+  --pad: clamp(1.25rem, 4vw, 3rem);
+  --sans: 'Geist', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The field: a fine vertical weave over a warm glow. Fixed, and drawn with plain gradients
+   rather than a blurred layer, so it costs nothing per scroll frame. */
+.home::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgb(66 58 40 / 0.028) 0 1px, transparent 1px 24px),
+    radial-gradient(70% 46% at 50% 0%, rgb(255 252 244 / 0.95), transparent 68%),
+    radial-gradient(46% 38% at 92% 18%, rgb(245 158 11 / 0.07), transparent 70%);
+}
+
+/* ---------- primitives ---------------------------------------------------- */
+
+.home *,
+.home *::before,
+.home *::after { box-sizing: border-box; }
+
+.home :focus-visible {
+  outline: 2px solid var(--amber-ink);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+.home .wrap {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: var(--pad);
+  padding-right: var(--pad);
+}
+.home .wrap-wide { max-width: 1340px; }
+
+.home section { padding: clamp(4.5rem, 9vh, 7.5rem) 0; }
+/* the nav floats over the page, so a hash jump has to stop short of it */
+.home section[id] { scroll-margin-top: 104px; }
+
+.home h1, .home h2, .home h3 { margin: 0; }
+.home h1 {
+  font-size: clamp(2.6rem, 5.6vw, 4.75rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+.home h2 {
+  font-size: clamp(2rem, 3.7vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+}
+.home h3 {
+  font-size: 1.3125rem;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.25;
+}
+.home h4 { margin: 0; font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.018em; }
+.home p { margin: 0; }
+
+.home .lede {
+  font-size: clamp(1rem, 1.3vw, 1.125rem);
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.home .body { font-size: 0.9375rem; line-height: 1.68; color: var(--ink-soft); }
+
+/* the centered head every section shares */
+.home .head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.125rem;
+  text-align: center;
+}
+.home .head h2 { max-width: 20ch; }
+.home .head .lede { max-width: 52ch; }
+
+/* the dark capsule that names a section */
+.home .tag {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 0.9375rem;
+  border-radius: var(--pill);
+  background: var(--dark);
+  color: var(--on-dark);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.home .dark .tag { background: rgb(255 255 255 / 0.12); }
+
+.home .mono { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.1em; color: var(--ink-soft); }
+
+/* ---------- pills (buttons) ---------------------------------------------- */
+
+.home .cta,
+.home .cta-2 {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  padding: 0 1.75rem;
+  border-radius: var(--pill);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 90ms ease, box-shadow 160ms ease;
+}
+.home .cta {
+  background: var(--dark);
+  color: var(--on-dark);
+  border: 1px solid var(--dark);
+  box-shadow: var(--shadow-sm);
+}
+.home .cta:hover { background: #000; }
+.home .cta:active { transform: translateY(1px); }
+.home .cta-2 {
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+.home .cta-2:hover { background: var(--cream-2); }
+.home .cta-2:active { transform: translateY(1px); }
+.home .cta.sm, .home .cta-2.sm { height: 40px; padding: 0 1.25rem; font-size: 0.875rem; }
+
+/* inverted pair, for the dark blocks */
+.home .dark .cta { background: var(--white); color: var(--ink); border-color: var(--white); }
+.home .dark .cta:hover { background: var(--cream); }
+.home .dark .cta-2 { background: transparent; color: var(--on-dark); border-color: rgb(255 255 255 / 0.5); }
+.home .dark .cta-2:hover { background: rgb(255 255 255 / 0.08); }
+.home .dark :focus-visible { outline-color: var(--amber); }
+
+.home .skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--pill);
+  padding: 0.625rem 1.125rem;
+}
+.home .skip:focus { left: 1rem; top: 1rem; }
+
+/* ---------- cards & shots ------------------------------------------------- */
+
+.home .card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+}
+.home .dark .card {
+  background: var(--dark-2);
+  border-color: var(--dark-line);
+  box-shadow: none;
+}
+
+/* a screenshot resting on a white mat, the way the reference frames its product shots */
+.home .shot {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 10px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.home .shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--r-lg) - 11px);
+}
+.home .shot.lg { box-shadow: var(--shadow-lg); }
+
+/* ---------- floating pill nav -------------------------------------------- */
+
+.home .nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 1rem 0 0;
+  display: flex;
+  justify-content: center;
+}
+.home .nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  height: 60px;
+  padding: 0 0.5rem 0 1.5rem;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--dark) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: var(--shadow-md);
+  max-width: calc(100vw - 2rem);
+}
+.home .brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--on-dark);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.home .brand .th {
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: var(--on-dark-soft);
+}
+.home .nav-links { display: flex; align-items: center; gap: 1.5rem; }
+.home .nav-links a {
+  position: relative;
+  padding: 0.375rem 0.125rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--on-dark-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 140ms ease, transform 90ms ease;
+}
+.home .nav-links a:hover { color: var(--on-dark); }
+.home .nav-links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--pill);
+  background: var(--amber);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.home .nav-links a:hover::after,
+.home .nav-links a:focus-visible::after { transform: scaleX(1); }
+.home .nav-links a:active { transform: translateY(1px); }
+.home .nav-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 1.25rem;
+  border-radius: var(--pill);
+  border: 1px solid var(--white);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 160ms ease, transform 90ms ease;
+}
+.home .nav-cta:hover { background: var(--cream); }
+.home .nav-cta:active { transform: translateY(1px); }
+.home .nav-rule { width: 1px; height: 26px; background: var(--dark-line); }
+
+@media (max-width: 900px) {
+  /* only the brand and the one CTA survive; the tagline goes first, or the pill overflows the screen */
+  .home .nav-links, .home .nav-rule, .home .brand .th { display: none; }
+  .home .nav-bar { gap: 1rem; height: 56px; padding-left: 1.25rem; }
+  .home .nav-cta { height: 40px; padding: 0 1rem; }
+}
+
+/* ---------- hero ---------------------------------------------------------- */
+
+.home .hero {
+  padding-top: clamp(3rem, 7vh, 5.5rem);
+  padding-bottom: 0;
+  text-align: center;
+}
+.home .hero-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+}
+.home .hero h1 { max-width: 16ch; }
+.home .hero .lede { max-width: 46ch; }
+.home .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
+
+/* announcement capsule: amber chip inside a frosted pill */
+.home .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 40px;
+  padding: 0 1rem 0 0.375rem;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--white) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.home .badge .chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 0.75rem;
+  border-radius: var(--pill);
+  background: var(--amber);
+  color: #241703;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+.home .badge .go { color: var(--ink-soft); font-weight: 500; }
+.home .badge:hover { background: var(--white); }
+
+/* the hero shot sits half out of the fold, wider than the text column */
+.home .hero-stage {
+  margin-top: clamp(2.5rem, 6vh, 4.5rem);
+  position: relative;
+}
+.home .hero-stage .shot { padding: 12px; }
+.home .hero-stage .shot img {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: top center;
+}
+/* one floating capsule overlapping the shot, the reference's signature move */
+.home .float-chip {
+  position: absolute;
+  left: clamp(0.5rem, 3vw, 3rem);
+  top: -23px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  height: 46px;
+  padding: 0 1.125rem;
+  border-radius: var(--pill);
+  background: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.home .float-chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--pill);
+  background: var(--amber);
+}
+
+@media (max-width: 760px) {
+  .home .hero-stage .shot img { aspect-ratio: auto; }
+  .home .float-chip { display: none; }
+}
+
+/* ---------- planning: two command cards + the artifacts ------------------- */
+
+.home .skill-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: clamp(2.5rem, 5vh, 3.5rem);
+}
+.home .skill {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: clamp(1.5rem, 2.6vw, 2.25rem);
+}
+.home .skill .cmd {
+  font-family: var(--mono);
+  font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--amber-ink);
+}
+.home .skill p:not(.cmd) { font-size: 0.9375rem; line-height: 1.68; color: var(--ink-soft); }
+
+.home .twin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+  align-items: end;
+}
+.home .twin-cell { display: flex; flex-direction: column; gap: 0.75rem; }
+.home .twin-cell .mono { text-align: center; }
+
+@media (max-width: 860px) {
+  .home .skill-pair, .home .twin-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- steps: alternating rows -------------------------------------- */
+
+.home .steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3rem, 7vh, 5.5rem);
+  margin-top: clamp(3rem, 6vh, 4.5rem);
+}
+.home .step-row {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+}
+.home .step-row.flip {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+}
+.home .step-row.flip > .step-copy { order: 2; }
+.home .step-copy { display: flex; flex-direction: column; gap: 0.875rem; }
+.home .step-copy .rule {
+  width: 34px;
+  height: 3px;
+  border-radius: var(--pill);
+  background: var(--amber);
+}
+.home .step-copy .body { max-width: 42ch; }
+
+@media (max-width: 900px) {
+  .home .step-row { grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+  .home .step-row.flip > .step-copy { order: 0; }
+}
+
+/* ---------- dark blocks --------------------------------------------------- */
+
+.home .dark {
+  background: var(--dark);
+  color: var(--on-dark);
+  border-radius: clamp(26px, 3vw, 40px);
+}
+.home .dark .lede, .home .dark .body { color: var(--on-dark-soft); }
+.home .dark-inner { padding: clamp(3.5rem, 8vh, 6rem) clamp(1.5rem, 4vw, 4rem); }
+
+.home .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: clamp(2.5rem, 5vh, 3.5rem);
+}
+.home .feature {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1.75rem;
+}
+.home .feature .rule {
+  width: 28px;
+  height: 3px;
+  border-radius: var(--pill);
+  background: var(--amber);
+  margin-bottom: 0.375rem;
+}
+.home .feature p { font-size: 0.875rem; line-height: 1.62; color: var(--on-dark-soft); }
+
+@media (max-width: 900px) { .home .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .home .feature-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- FAQ ----------------------------------------------------------- */
+
+.home .faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: clamp(2.5rem, 5vh, 3.5rem) auto 0;
+  max-width: 820px;
+}
+.home .faq { padding: 0; overflow: hidden; }
+.home .faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  list-style: none;
+}
+.home .faq summary::-webkit-details-marker { display: none; }
+.home .faq summary::after {
+  content: '+';
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+  transition: transform 200ms ease;
+}
+.home .faq[open] summary::after { transform: rotate(45deg); }
+.home .faq summary:active { transform: translateY(1px); }
+.home .faq[open] { border-color: var(--line-strong); }
+.home .faq p {
+  padding: 0 1.5rem 1.375rem;
+  font-size: 0.9375rem;
+  line-height: 1.68;
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+/* An open/close that animates BOTH ways needs ::details-content: the answer is display:none while
+   closed, so there is nothing for a transition on the <p> itself to hold on to. interpolate-size
+   is what lets the height land on `auto` instead of a guessed pixel value, and allow-discrete keeps
+   the content painted while it retracts. Browsers without these just snap, which is fine. */
+@supports (selector(::details-content)) and (interpolate-size: allow-keywords) {
+  .home .faq { interpolate-size: allow-keywords; }
+  .home .faq::details-content {
+    block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      block-size 320ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 220ms ease,
+      content-visibility 320ms allow-discrete;
+  }
+  .home .faq[open]::details-content { block-size: auto; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home .faq::details-content { transition: none; }
+  .home .faq summary::after { transition: none; }
+}
+
+/* ---------- closing + footer --------------------------------------------- */
+
+.home .close .dark-inner { display: flex; justify-content: center; }
+.home .close .head { gap: 1.5rem; }
+
+.home .foot {
+  background: var(--dark);
+  color: var(--on-dark);
+  padding: clamp(3rem, 6vh, 4.5rem) 0 2rem;
+}
+.home .foot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) repeat(3, minmax(0, 2fr));
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+.home .foot-brand { display: flex; flex-direction: column; gap: 0.75rem; }
+.home .foot-brand p { font-size: 0.875rem; line-height: 1.6; color: var(--on-dark-soft); max-width: 34ch; }
+.home .foot-col { display: flex; flex-direction: column; gap: 0.75rem; }
+.home .foot-col h4 { font-size: 0.8125rem; letter-spacing: 0.02em; }
+.home .foot-col a, .home .foot-col span {
+  font-size: 0.875rem;
+  color: var(--on-dark-soft);
+  text-decoration: none;
+}
+.home .foot-col a:hover { color: var(--on-dark); }
+.home .foot-base {
+  margin-top: clamp(2.5rem, 5vh, 3.5rem);
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--dark-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.home .foot-base .mono { color: var(--on-dark-soft); }
+
+@media (max-width: 860px) {
+  .home .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- motion -------------------------------------------------------- */
+/* Motivated: the hero cascade establishes reading order; the section reveal keeps
+   attention on the block being read. Nothing loops, nothing parallaxes. */
+
+@keyframes home-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* the section you jumped to announces itself: the label springs, the headline lifts under it */
+@keyframes tag-pop {
+  0% { transform: scale(0.82); }
+  62% { transform: scale(1.07); }
+  100% { transform: none; }
+}
+@keyframes head-lift {
+  from { opacity: 0.35; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rule-draw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Scoped with :has so it lives and dies with the homepage: the product screens keep instant
+     scrolling. This is what turns every in-page link, nav or hero or footer, into a glide. */
+  :root:has(.home) { scroll-behavior: smooth; }
+
+  /* Feedback for the click itself. :target covers the hash landing; `.hit` is stamped on by the
+     one delegated click handler so clicking the SAME link again replays it instead of doing nothing. */
+  .home section:target .tag,
+  .home section.hit .tag { animation: tag-pop 540ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .home section:target .head h2,
+  .home section.hit .head h2 { animation: head-lift 520ms 70ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .home section:target .head .lede,
+  .home section.hit .head .lede { animation: head-lift 520ms 150ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .home section:target .step-copy .rule,
+  .home section:target .feature .rule,
+  .home section.hit .step-copy .rule,
+  .home section.hit .feature .rule {
+    transform-origin: left center;
+    animation: rule-draw 420ms 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .home .rise {
+    animation: home-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 90ms);
+  }
+
+  /* scroll-driven, so there is no scroll listener and no observer to leak */
+  @supports (animation-timeline: view()) {
+    .home .reveal {
+      animation: home-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 22%;
+    }
+  }
+}
+
+/* ---------- blur fallbacks ------------------------------------------------ */
+/* Last in the file on purpose: these override the nav bar and the badge, which set their
+   own backdrop-filter above. Both paths land on an opaque surface, so the layout never
+   shifts and the text keeps the contrast it was measured at. */
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .home .nav-bar { background: var(--dark); }
+  .home .badge { background: var(--white); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .home .nav-bar {
+    background: var(--dark);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .home .badge {
+    background: var(--white);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .home::before { opacity: 0.5; }
+}
