@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yak Dai — Redesign Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!--
+  Redesign mockup of plan-to-linear, following jakubkrehel/skills better-ui:
+  shadow rings over borders (with a transparent border for forced-colors), concentric radii,
+  press scale 0.96 / 150ms ease-out, named transition properties, hover behind (hover: hover),
+  motion gated on prefers-reduced-motion, 100ms staggered entrances, icon cross-fades,
+  theme-switch transition suppression, overscroll containment, currentColor icons.
+  ponytail: all data is mocked in-page; the real app wires these to src/lib/api.ts.
+-->
+<style>
+/* better-colors: two tiers. Primitives name a value and are never used in components;
+   components only read the --color-* semantic tier, which each appearance repoints.
+   Ramps: one warm neutral (hue 70), one accent (orange 50), and the three statuses the app renders
+   (green 150, yellow 85, red 25 — each >= 15deg from the accent). Chroma is the same share of each
+   hue's own sRGB maximum, peaking mid-ramp. Every pair below was measured (WCAG 2 + APCA). */
+:root {
+  color-scheme: light;
+  --neutral-50: oklch(0.985 0.004 70);
+  --neutral-100: oklch(0.95 0.005 70);
+  --neutral-200: oklch(0.91 0.005 70);
+  --neutral-300: oklch(0.86 0.006 70);
+  --neutral-400: oklch(0.77 0.008 70);
+  --neutral-500: oklch(0.62 0.01 70);
+  --neutral-600: oklch(0.52 0.01 70);
+  --neutral-700: oklch(0.47 0.009 70);
+  --neutral-800: oklch(0.37 0.007 70);
+  --neutral-850: oklch(0.31 0.006 70);
+  --neutral-900: oklch(0.265 0.005 70);
+  --neutral-925: oklch(0.23 0.005 70);
+  --neutral-950: oklch(0.2 0.004 70);
+  --neutral-975: oklch(0.17 0.004 70);
+  --orange-100: oklch(0.955 0.015 50);
+  --orange-300: oklch(0.85 0.06 50);
+  --orange-400: oklch(0.75 0.128 50);
+  --orange-600: oklch(0.54 0.125 50);
+  --orange-700: oklch(0.47 0.099 50);
+  --orange-950: oklch(0.255 0.041 50);
+  --green-100: oklch(0.955 0.046 150);
+  --green-300: oklch(0.85 0.155 150);
+  --green-400: oklch(0.75 0.159 150);
+  --green-600: oklch(0.54 0.13 150);
+  --green-700: oklch(0.47 0.103 150);
+  --green-950: oklch(0.255 0.043 150);
+  --yellow-100: oklch(0.955 0.029 85);
+  --yellow-300: oklch(0.85 0.11 85);
+  --yellow-400: oklch(0.75 0.119 85);
+  --yellow-600: oklch(0.54 0.097 85);
+  --yellow-700: oklch(0.47 0.077 85);
+  --yellow-800: oklch(0.38 0.054 85);
+  --yellow-950: oklch(0.255 0.032 85);
+  --red-100: oklch(0.955 0.014 25);
+  --red-300: oklch(0.85 0.054 25);
+  --red-400: oklch(0.75 0.116 25);
+  --red-600: oklch(0.54 0.191 25);
+  --red-700: oklch(0.47 0.152 25);
+  --red-950: oklch(0.255 0.064 25);
+
+  --color-bg-page: var(--neutral-50);
+  --color-bg-surface: var(--neutral-50);
+  --color-bg-subtle: var(--neutral-100);
+  --color-bg-muted: var(--neutral-200);
+  --color-bg-hover: var(--neutral-100);
+  --color-bg-selected: var(--neutral-200);
+  --color-text-primary: var(--neutral-900);
+  --color-text-secondary: var(--neutral-700);
+  --color-text-tertiary: var(--neutral-600);
+  --color-text-on-accent: var(--neutral-50);
+  --color-text-on-solid: var(--neutral-50);
+  --color-border-separator: var(--neutral-200);
+  --color-border-default: var(--neutral-300);
+  --color-border-strong: var(--neutral-600);
+  --color-accent-subtle: var(--orange-100);
+  --color-accent-solid: var(--orange-600);
+  --color-accent-solid-hover: var(--orange-700);
+  --color-accent-text: var(--orange-700);
+  --color-success-subtle: var(--green-100);
+  --color-success-solid: var(--green-600);
+  --color-success-solid-hover: var(--green-700);
+  --color-success-text: var(--green-700);
+  --color-warning-subtle: var(--yellow-100);
+  --color-warning-border: var(--yellow-300);
+  --color-warning-solid: var(--yellow-600);
+  --color-warning-text: var(--yellow-700);
+  --color-danger-subtle: var(--red-100);
+  --color-danger-solid: var(--red-600);
+  --color-danger-solid-hover: var(--red-700);
+  --color-danger-text: var(--red-700);
+  --color-bg-overlay: oklch(0.2 0.004 70 / 0.32);
+  --color-border-focus: var(--color-accent-solid);
+
+  --shadow-border:
+    0px 0px 0px 1px oklch(0 0 0 / 0.06),
+    0px 1px 2px -1px oklch(0 0 0 / 0.06),
+    0px 2px 4px 0px oklch(0 0 0 / 0.04);
+  --shadow-border-hover:
+    0px 0px 0px 1px oklch(0 0 0 / 0.08),
+    0px 1px 2px -1px oklch(0 0 0 / 0.08),
+    0px 2px 4px 0px oklch(0 0 0 / 0.06);
+  --shadow-pop:
+    0px 0px 0px 1px oklch(0 0 0 / 0.06),
+    0px 8px 16px -4px oklch(0 0 0 / 0.08),
+    0px 24px 48px -12px oklch(0 0 0 / 0.14);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+/* one switching mechanism: data-theme (the toggle). The OS preference only picks its initial value. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg-page: var(--neutral-975);
+  --color-bg-surface: var(--neutral-950);
+  --color-bg-subtle: var(--neutral-925);
+  --color-bg-muted: var(--neutral-900);
+  --color-bg-hover: var(--neutral-925);
+  --color-bg-selected: var(--neutral-900);
+  --color-text-primary: var(--neutral-100);
+  --color-text-secondary: var(--neutral-400);
+  --color-text-tertiary: var(--neutral-500);
+  --color-text-on-accent: var(--neutral-975);
+  --color-text-on-solid: var(--neutral-975);
+  --color-border-separator: var(--neutral-850);
+  --color-border-default: var(--neutral-800);
+  --color-border-strong: var(--neutral-500);
+  --color-accent-subtle: var(--orange-950);
+  --color-accent-solid: var(--orange-400);
+  --color-accent-solid-hover: var(--orange-300);
+  --color-accent-text: var(--orange-300);
+  --color-success-subtle: var(--green-950);
+  --color-success-solid: var(--green-400);
+  --color-success-solid-hover: var(--green-300);
+  --color-success-text: var(--green-300);
+  --color-warning-subtle: var(--yellow-950);
+  --color-warning-border: var(--yellow-800);
+  --color-warning-solid: var(--yellow-400);
+  --color-warning-text: var(--yellow-300);
+  --color-danger-subtle: var(--red-950);
+  --color-danger-solid: var(--red-400);
+  --color-danger-solid-hover: var(--red-300);
+  --color-danger-text: var(--red-300);
+  --color-bg-overlay: oklch(0 0 0 / 0.5);
+
+  --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.08);
+  --shadow-border-hover: 0 0 0 1px oklch(1 0 0 / 0.13);
+  --shadow-pop: 0 0 0 1px oklch(1 0 0 / 0.1), 0 24px 48px -12px oklch(0 0 0 / 0.6);
+}
+/* increased contrast: each appearance gets its own values, >= 0.15 OKLCH L further from its background */
+@media (prefers-contrast: more) {
+  :root:not([data-theme="dark"]) {
+    --color-text-secondary: var(--neutral-850);
+    --color-text-tertiary: var(--neutral-800);
+    --color-border-strong: var(--neutral-800);
+    --color-border-separator: var(--neutral-500);
+    --color-border-default: var(--neutral-600);
+  }
+  :root[data-theme="dark"] {
+    --color-text-secondary: var(--neutral-100);
+    --color-text-tertiary: var(--neutral-300);
+    --color-border-strong: var(--neutral-400);
+    --color-border-separator: var(--neutral-600);
+    --color-border-default: var(--neutral-500);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--color-bg-page); color: var(--color-text-primary);
+  font: 400 14px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.92em; }
+code { background: var(--color-bg-muted); padding: 1px 5px; border-radius: 5px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { text-wrap: pretty; margin: 0; }
+:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- icons: one sprite, currentColor, stroke tracks adjacent text weight ---------- */
+.ic { width: 1.15em; height: 1.15em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+symbol * { vector-effect: non-scaling-stroke; }
+.btn .ic, .seg .ic { stroke-width: 2; }
+
+/* ---------- surfaces: shadow ring for elevation, transparent border for forced-colors ---------- */
+.surface {
+  background: var(--color-bg-surface);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-border);
+  border-radius: 12px;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding-inline: 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+  border: 1px solid transparent;
+  transition-property: background-color, color, box-shadow, scale, opacity;
+  transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.btn.lead { padding-inline-start: 10px; }   /* icon side gets 2px less */
+.btn.trail { padding-inline-end: 10px; }
+.btn:not(:disabled):active { scale: 0.96; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent-solid); color: var(--color-text-on-accent); box-shadow: 0 1px 2px oklch(0 0 0 / 0.12), inset 0 1px 0 oklch(1 0 0 / 0.18); }
+.btn-ghost { color: var(--color-text-secondary); }
+.btn-ghost[aria-pressed="true"], .btn-ghost.on { background: var(--color-bg-selected); color: var(--color-text-primary); }
+.btn-outline { background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-border); }
+.btn-approve { background: var(--color-success-solid); color: var(--color-text-on-solid); }
+.btn-skip { background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-border); }
+.btn-danger { background: var(--color-danger-solid); color: var(--color-text-on-solid); }
+.btn.sq { width: 32px; padding: 0; }
+.btn.lg { height: 40px; padding-inline: 16px; font-size: 14px; border-radius: 10px; }
+.btn.lg.lead { padding-inline-start: 14px; } .btn.lg.trail { padding-inline-end: 14px; }
+.btn.sm { height: 26px; padding-inline: 8px; font-size: 12px; border-radius: 7px; gap: 5px; }
+@media (hover: hover) {
+  .btn-primary:not(:disabled):hover { background: var(--color-accent-solid-hover); }
+  .btn-ghost:not(:disabled):hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+  .btn-outline:not(:disabled):hover { box-shadow: var(--shadow-border-hover); }
+  .btn-approve:not(:disabled):hover { background: var(--color-success-solid-hover); }
+  .btn-danger:not(:disabled):hover { background: var(--color-danger-solid-hover); }
+  .btn-skip:not(:disabled):hover { box-shadow: var(--shadow-border-hover); }
+}
+kbd {
+  font: 500 11px/1 var(--mono); padding: 3px 5px; border-radius: 5px;
+  background: var(--color-bg-surface); box-shadow: var(--shadow-border); color: var(--color-text-secondary);
+}
+
+/* segmented control: outer 10 = inner 7 + padding 3 */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--color-bg-muted); }
+.seg button {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding-inline: 10px 12px;
+  border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--color-text-secondary);
+  transition-property: background-color, color; transition-duration: 120ms; transition-timing-function: ease-out;
+}
+.seg button[aria-selected="true"] { background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-border); }
+@media (hover: hover) { .seg button[aria-selected="false"]:hover { color: var(--color-text-primary); } }
+
+/* chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding-inline: 7px;
+  border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap;
+  background: var(--color-bg-muted); color: var(--color-text-secondary);
+  border: 1px solid transparent;
+  transition-property: background-color, color; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.chip .ic { width: 13px; height: 13px; }
+.chip.code { font-family: var(--mono); font-size: 11.5px; }
+.chip.ok { background: var(--color-success-subtle); color: var(--color-success-text); }
+.chip.accent { background: var(--color-accent-subtle); color: var(--color-accent-text); }
+.chip.warn { background: var(--color-warning-subtle); border: 1px dashed var(--color-warning-border); color: var(--color-warning-text); }
+button.chip:not(:disabled):active { scale: 0.96; }
+@media (hover: hover) { button.chip:hover { color: var(--color-text-primary); } }
+
+/* copy button: both icons in the DOM, cross-faded 300ms */
+.swap { position: relative; display: inline-grid; width: 1.15em; height: 1.15em; }
+.swap > .ic { grid-area: 1 / 1; transition-property: opacity, scale, filter; transition-duration: 300ms; transition-timing-function: var(--ease); }
+.swap > .ic:last-child { opacity: 0; scale: 0.25; filter: blur(4px); }
+.copied .swap > .ic:first-child { opacity: 0; scale: 0.25; filter: blur(4px); }
+.copied .swap > .ic:last-child { opacity: 1; scale: 1; filter: blur(0); }
+.copied { color: var(--color-success-text) !important; }
+@media (prefers-reduced-motion: reduce) { .swap > .ic { scale: 1 !important; filter: none !important; } }
+
+/* staggered entrance for infrequent moments (landing, end-of-deck). Hidden state lives in `from`. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes enter { from { opacity: 0; filter: blur(4px); translate: 0 12px; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes enter { from { opacity: 0; } }
+}
+.stagger > * { animation: enter 300ms ease-out both; }
+.stagger > :nth-child(2) { animation-delay: 100ms; }
+.stagger > :nth-child(3) { animation-delay: 200ms; }
+.stagger > :nth-child(4) { animation-delay: 300ms; }
+.stagger > :nth-child(5) { animation-delay: 400ms; }
+
+/* ================= LANDING ================= */
+#landing { min-height: 100%; overflow: auto; }
+.l-nav { max-width: 1120px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; gap: 8px; }
+.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--color-accent-solid); color: var(--color-text-on-accent);
+}
+.brand-mark .ic { stroke-width: 2.5; width: 15px; height: 15px; }
+.l-hero { max-width: 760px; margin: 0 auto; padding: 72px 24px 40px; text-align: center; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-secondary); }
+.l-hero h1 { font-size: clamp(36px, 6vw, 58px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 600; margin: 18px 0 18px; }
+.l-hero h1 em { font-style: normal; color: var(--color-text-secondary); }
+.l-hero p { font-size: 17px; color: var(--color-text-secondary); max-width: 560px; margin: 0 auto; }
+.l-cta { display: flex; gap: 10px; justify-content: center; margin-top: 28px; flex-wrap: wrap; }
+.l-steps { max-width: 1120px; margin: 24px auto 0; padding: 0 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.l-step { padding: 20px; }
+.l-step .n { font: 500 12px var(--mono); color: var(--color-text-tertiary); }
+.l-step h3 { font-size: 16px; font-weight: 600; margin: 10px 0 6px; letter-spacing: -0.01em; }
+.l-step p { color: var(--color-text-secondary); font-size: 14px; }
+.l-feat { max-width: 1120px; margin: 56px auto 80px; padding: 0 24px; }
+.l-feat h2 { font-size: 26px; letter-spacing: -0.02em; font-weight: 600; margin-bottom: 20px; }
+.l-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.l-card { padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+.l-card .ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--color-bg-muted); color: var(--color-text-secondary); margin-bottom: 6px; }
+.l-card h3 { font-size: 15px; font-weight: 600; }
+.l-card p { font-size: 13.5px; color: var(--color-text-secondary); }
+@media (max-width: 820px) { .l-steps, .l-grid { grid-template-columns: 1fr; } .l-hero { padding-top: 40px; } }
+
+/* ================= APP SHELL ================= */
+#app { display: none; height: 100dvh; grid-template-columns: 264px minmax(0, 1fr) 0; }
+body.in-app #app { display: grid; }
+body.in-app #landing { display: none; }
+#app.has-ctx { grid-template-columns: 264px minmax(0, 1fr) minmax(360px, 34vw); }
+
+/* sidebar */
+.side {
+  border-right: 1px solid var(--color-border-separator); background: var(--color-bg-page);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.side-top { padding: 14px 12px 10px; display: flex; flex-direction: column; gap: 12px; }
+.side-top .brand { padding: 4px 6px; border-radius: 8px; }
+.side-list { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 4px 8px; }
+.side-label { display: flex; justify-content: space-between; padding: 10px 8px 6px; }
+.proj {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px;
+  border-radius: 8px;
+  transition-property: background-color; transition-duration: 120ms; transition-timing-function: ease-out;
+}
+.proj[aria-current="true"] { background: var(--color-bg-selected); }
+.proj-open { text-align: left; padding: 8px 8px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.proj-title { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--color-text-tertiary); }
+.proj[aria-current="true"] .proj-meta { color: var(--color-text-secondary); } /* tertiary is only measured on page, surface and subtle */
+.mini-bar { width: 44px; height: 4px; border-radius: 2px; background: var(--color-bg-muted); overflow: hidden; }
+.proj[aria-current="true"] .mini-bar { background: var(--color-border-separator); }
+.mini-bar > i { display: block; height: 100%; background: var(--color-success-solid); border-radius: 2px; }
+.proj-del { opacity: 0; margin-right: 4px; transition-property: opacity, background-color, color, scale; }
+.proj:focus-within .proj-del { opacity: 1; }
+@media (hover: hover) {
+  .proj:hover { background: var(--color-bg-hover); }
+  .proj[aria-current="true"]:hover { background: var(--color-bg-selected); }
+  .proj:hover .proj-del { opacity: 1; }
+  .proj-del:hover { color: var(--color-danger-text) !important; }
+}
+@media (hover: none) { .proj-del { opacity: 1; } }
+.side-pager { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--color-border-separator); }
+.side-foot { padding: 10px 12px; border-top: 1px solid var(--color-border-separator); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.api-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.api-dot i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success-solid); box-shadow: 0 0 0 3px var(--color-success-subtle); }
+
+/* main column */
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.head {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px; min-height: 56px;
+  border-bottom: 1px solid var(--color-border-separator); background: var(--color-bg-page);
+}
+.head h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.head .grow { flex: 1; }
+.sync { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-tertiary); white-space: nowrap; }
+.sync i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success-solid); transition-property: background-color; transition-duration: 150ms; }
+.sync[data-s="syncing"] i { background: var(--color-warning-solid); }
+.sync[data-s="error"] { color: var(--color-danger-text); } .sync[data-s="error"] i { background: var(--color-danger-solid); }
+.only-narrow, .only-mobile { display: none !important; }
+.body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+
+/* progress */
+.progress { display: flex; align-items: center; gap: 12px; }
+.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--color-bg-muted); overflow: hidden; display: flex; }
+.bar > i { display: block; height: 100%; transition-property: width; transition-duration: 300ms; transition-timing-function: var(--ease); }
+.bar > .d { background: var(--color-success-solid); } .bar > .s { background: var(--color-border-strong); }
+.progress-txt { font-size: 12.5px; color: var(--color-text-secondary); white-space: nowrap; }
+.progress-txt b { color: var(--color-text-primary); font-weight: 600; }
+
+/* ================= FOCUS DECK ================= */
+.focus { height: 100%; display: flex; flex-direction: column; padding: 16px 20px 16px; gap: 14px; max-width: 820px; margin: 0 auto; }
+.rail { display: flex; gap: 4px; }
+.rail button {
+  flex: 1; height: 22px; display: flex; align-items: center; border-radius: 4px;
+}
+.rail button > i {
+  display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--color-bg-muted);
+  transition-property: background-color, height; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.rail button[data-st="done"] > i { background: var(--color-success-solid); }
+.rail button[data-st="skip"] > i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--color-border-strong); }
+.rail button[data-st="top"] > i { background: var(--color-accent-solid); height: 6px; }
+@media (hover: hover) { .rail button:hover > i { height: 6px; } }
+.deck { position: relative; flex: 1; min-height: 340px; }
+.card {
+  position: absolute; inset: 0; border-radius: 16px; background: var(--color-bg-surface);
+  border: 1px solid transparent; box-shadow: var(--shadow-pop);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.card.ghost { pointer-events: none; }
+.card.ghost.g1 { translate: 0 8px; scale: 0.97; opacity: 0.7; }
+.card.ghost.g2 { translate: 0 16px; scale: 0.94; opacity: 0.4; }
+.card.top { touch-action: pan-y; cursor: grab; will-change: transform; }
+.card.top.dragging { cursor: grabbing; user-select: none; }
+.card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--color-accent-solid); }
+.card-scroll { overflow: auto; overscroll-behavior: contain; padding: 22px 26px 26px 28px; flex: 1; }
+.stamp {
+  position: absolute; top: 18px; z-index: 2; padding: 6px 12px; border-radius: 8px;
+  font: 600 13px var(--sans); letter-spacing: 0.02em; text-transform: uppercase; opacity: 0; pointer-events: none;
+}
+.stamp.yes { right: 18px; background: var(--color-success-solid); color: var(--color-text-on-solid); }
+.stamp.no { left: 18px; background: var(--color-bg-muted); color: var(--color-text-primary); }
+.card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.card-top .grow { flex: 1; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--mono); color: var(--color-text-secondary); }
+.tag .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent-solid); }
+.card h2 { font-size: 22px; line-height: 1.25; letter-spacing: -0.02em; font-weight: 600; }
+.refs { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.ref-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ref-row .k { font-size: 11.5px; color: var(--color-text-tertiary); width: 74px; flex: none; }
+.ref-row .v { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.dep { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dep .why { font-size: 12.5px; color: var(--color-text-secondary); }
+.dep .chip { white-space: normal; height: auto; min-height: 22px; padding-block: 2px; text-align: left; }
+.callout { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-top: 16px; }
+.callout.warn { background: var(--color-warning-subtle); color: var(--color-warning-text); }
+.callout.err { background: var(--color-danger-subtle); color: var(--color-danger-text); }
+.callout .ic { margin-top: 2px; }
+.secs { display: flex; flex-direction: column; gap: 22px; margin-top: 22px; }
+.sec h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text-secondary); }
+.sec h4::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--color-border-strong); }
+.sec p { font-size: 14.5px; line-height: 1.6; }
+.scenario { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--color-bg-subtle); font-size: 13.5px; color: var(--color-text-secondary); }
+.scenario b { color: var(--color-text-primary); font-weight: 600; }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 8px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 14.5px; line-height: 1.55; }
+.steps li::before { content: counter(s); font: 500 11px/22px var(--mono); text-align: center; height: 22px; border-radius: 6px; background: var(--color-bg-muted); color: var(--color-text-secondary); }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.compare > div { padding: 10px 12px; border-radius: 10px; font-size: 13.5px; }
+.compare .b { background: var(--color-danger-subtle); } .compare .a { background: var(--color-success-subtle); }
+.compare b { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.compare .b b { color: var(--color-danger-text); } .compare .a b { color: var(--color-success-text); }
+.deck-actions { display: flex; align-items: center; gap: 8px; }
+.deck-actions .hint { flex: 1; text-align: center; font-size: 12px; color: var(--color-text-tertiary); display: flex; gap: 6px; align-items: center; justify-content: center; }
+.flash { animation: flash 1200ms ease-out 1; }
+@keyframes flash { from { box-shadow: 0 0 0 2px var(--color-accent-solid), var(--shadow-pop); } }
+
+/* end of deck */
+.end { height: 100%; display: grid; place-items: center; padding: 24px; }
+.end-inner { text-align: center; max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.end-badge { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; background: var(--color-success-subtle); color: var(--color-success-text); }
+.end-badge .ic { width: 30px; height: 30px; stroke-width: 2.5; }
+.end h2 { font-size: 26px; letter-spacing: -0.02em; font-weight: 600; }
+.end p { color: var(--color-text-secondary); }
+.end .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+/* ================= LIST ================= */
+.list { max-width: 860px; margin: 0 auto; padding: 18px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+.track-head { display: flex; align-items: center; gap: 10px; padding: 0 4px 8px; }
+.track-head .eyebrow { color: var(--color-text-primary); }
+.track-head .note { font-size: 12px; color: var(--color-text-tertiary); }
+.track { padding: 4px; }
+.track.rail-on { position: relative; }
+.row { border-radius: 8px; transition-property: background-color; transition-duration: 120ms; transition-timing-function: ease-out; }
+.row + .row { margin-top: 2px; }
+.row.sel { background: var(--color-bg-selected); box-shadow: inset 3px 0 0 var(--color-accent-solid); }
+.row-line { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
+.check {
+  width: 20px; height: 20px; border-radius: 6px; flex: none; display: grid; place-items: center;
+  border: 1.5px solid var(--color-border-strong); color: transparent;
+  transition-property: background-color, border-color, color, scale; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.check .ic { width: 13px; height: 13px; stroke-width: 2.5; }
+.check[aria-checked="true"] { background: var(--color-success-solid); border-color: var(--color-success-solid); color: var(--color-text-on-solid); }
+.check:active { scale: 0.96; }
+.row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; padding: 4px 0; }
+.row-main .n { font: 500 12px var(--mono); color: var(--color-text-tertiary); width: 22px; }
+.row.sel .row-main .n { color: var(--color-text-secondary); }
+.row-main .t { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row[data-done="true"] .row-main .t { color: var(--color-text-secondary); text-decoration: line-through; text-decoration-color: var(--color-text-tertiary); }
+.row-main .meta { display: flex; gap: 6px; }
+.row-main .chev { color: var(--color-text-tertiary); transition-property: rotate; transition-duration: 150ms; transition-timing-function: ease-out; }
+.row[aria-expanded="true"] .chev { rotate: 180deg; }
+.row-detail { padding: 4px 16px 18px 70px; }
+.row-detail .tools { display: flex; gap: 6px; margin-bottom: 4px; }
+@media (hover: hover) { .row:not(.sel):hover { background: var(--color-bg-hover); } .check:hover { border-color: var(--color-success-solid); } }
+
+/* ================= CONTEXT PANE ================= */
+.ctx { border-left: 1px solid var(--color-border-separator); background: var(--color-bg-subtle); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+#app:not(.has-ctx) .ctx { display: none; }
+.ctx-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; min-height: 56px; border-bottom: 1px solid var(--color-border-separator); }
+.ctx-focus { padding: 10px 14px; font-size: 12.5px; color: var(--color-text-secondary); display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--color-border-separator); min-height: 41px; }
+.ctx-focus b { color: var(--color-text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctx-focus .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent-solid); flex: none; }
+.vp { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; }
+.vp.pannable { cursor: grab; } .vp.panning { cursor: grabbing; }
+.stage { position: absolute; inset: 0; transform-origin: 0 0; padding: 16px; }
+.stage svg { width: 100%; height: 100%; display: block; }
+.zoom {
+  position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 11px; background: var(--color-bg-surface); border: 1px solid transparent; box-shadow: var(--shadow-border);
+}
+.zoom .btn { height: 28px; border-radius: 8px; }   /* 11 = 8 + 3 */
+.zoom .btn.sq { width: 28px; }
+.zoom span { font: 500 11.5px var(--mono); color: var(--color-text-secondary); min-width: 40px; text-align: center; }
+/* diagram marks */
+.n-box { fill: var(--color-bg-surface); stroke: var(--color-border-default); stroke-width: 1; transition-property: fill, stroke, opacity; transition-duration: 150ms; }
+.n-lbl { fill: var(--color-text-primary); font: 500 12.5px var(--sans); transition-property: opacity; transition-duration: 150ms; }
+.n-sub { fill: var(--color-text-tertiary); font: 400 10.5px var(--mono); }
+.e-line { stroke: var(--color-border-strong); stroke-width: 1.25; fill: none; transition-property: stroke, opacity; transition-duration: 150ms; }
+.e-lbl { fill: var(--color-text-secondary); font: 400 10.5px var(--mono); }
+.has-hl .n:not(.hl), .has-hl .e:not(.hl), .has-hl .m:not(.hl) { opacity: 0.32; }
+.n.hl .n-box { fill: var(--color-accent-subtle); stroke: var(--color-accent-text); stroke-width: 1.5; }
+.e.hl .e-line, .m.hl .e-line { stroke: var(--color-accent-text); stroke-width: 1.75; }
+.e.hl .e-lbl, .m.hl .e-lbl { fill: var(--color-accent-text); }
+.life { stroke: var(--color-border-separator); stroke-dasharray: 3 4; }
+/* spec */
+.spec { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; gap: 18px; }
+.spec-sec .eyebrow { margin: 0 2px 8px; display: block; }
+.spec-entries { display: flex; flex-direction: column; gap: 6px; }
+.entry {
+  padding: 10px 12px; border-radius: 10px; background: var(--color-bg-surface); border: 1px solid transparent; box-shadow: var(--shadow-border);
+  transition-property: opacity, box-shadow; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.entry-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.entry-h b { font-weight: 600; font-size: 13.5px; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font: 400 12px/1.6 var(--mono); }
+.kv dt { color: var(--color-text-tertiary); } .kv dd { margin: 0; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.has-hl .entry:not(.hl) { opacity: 0.4; }
+.entry.hl { box-shadow: 0 0 0 1.5px var(--color-accent-solid), 0 4px 12px -4px var(--color-accent-subtle); }
+.entry.ping { animation: flash 1200ms ease-out 1; }
+pre.raw { margin: 0; padding: 14px; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ================= PASTE ================= */
+.paste { height: 100%; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 0; }
+.paste-ed { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--color-border-separator); }
+.paste-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--color-border-separator); }
+.paste textarea {
+  flex: 1; min-height: 0; resize: none; border: 0; outline: 0; background: transparent; padding: 18px 20px;
+  font: 12.5px/1.75 var(--mono); color: var(--color-text-primary); overscroll-behavior: contain;
+}
+.paste textarea::placeholder { color: var(--color-text-tertiary); }
+.paste-pv { display: flex; flex-direction: column; min-height: 0; background: var(--color-bg-subtle); }
+.pv-list { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.pv-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.pv-item .n { font: 500 12px var(--mono); color: var(--color-text-tertiary); }
+.pv-item .t { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-item.bad { opacity: 0.75; }
+.pv-empty { margin: auto; text-align: center; color: var(--color-text-secondary); max-width: 320px; display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 24px; }
+.pv-empty .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--color-bg-muted); color: var(--color-text-secondary); }
+.mismatch { margin: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.mismatch h3 { font-size: 14px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.mismatch p { font-size: 13px; color: var(--color-text-secondary); }
+.pv-foot { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--color-border-separator); }
+
+/* ================= OVERLAYS ================= */
+.scrim {
+  position: fixed; inset: 0; background: var(--color-bg-overlay); z-index: 40; opacity: 0; pointer-events: none;
+  transition-property: opacity; transition-duration: 200ms; transition-timing-function: ease-out;
+}
+.scrim.on { opacity: 1; pointer-events: auto; }
+
+dialog {
+  border: 1px solid transparent; border-radius: 14px; padding: 20px; width: min(400px, calc(100vw - 32px));
+  background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-pop);
+}
+dialog::backdrop { background: var(--color-bg-overlay); }
+dialog h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+dialog p { color: var(--color-text-secondary); font-size: 13.5px; }
+dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+.toasts { position: fixed; left: 50%; top: 14px; translate: -50% 0; z-index: 70; display: flex; flex-direction: column; gap: 8px; width: min(560px, calc(100vw - 32px)); pointer-events: none; }
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 12px;
+  background: var(--color-bg-surface); border: 1px solid transparent; box-shadow: var(--shadow-pop); font-size: 13px;
+  animation: enter 300ms ease-out both;
+  transition-property: opacity, filter, translate; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.toast.err { color: var(--color-danger-text); } .toast.info .ic { color: var(--color-text-secondary); }
+.toast span { flex: 1; min-width: 0; }
+.toast.out { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .toast.out { filter: blur(4px); translate: 0 -12px; } }
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 1180px) {
+  #app.has-ctx { grid-template-columns: 248px minmax(0, 1fr) 0; }
+  #app.has-ctx .ctx {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 45; box-shadow: var(--shadow-pop);
+    translate: 100% 0; visibility: hidden;
+    transition-property: translate, visibility; transition-duration: 300ms; transition-timing-function: var(--ease);
+  }
+  #app.has-ctx.ctx-open .ctx { translate: 0 0; visibility: visible; }
+  #app.has-ctx .only-narrow { display: inline-flex !important; }
+}
+@media (max-width: 1180px) and (prefers-reduced-motion: reduce) {
+  #app.has-ctx .ctx { translate: 0 0; opacity: 0; transition-property: opacity, visibility; transition-duration: 150ms; }
+  #app.has-ctx.ctx-open .ctx { opacity: 1; }
+}
+@media (max-width: 760px) {
+  #app, #app.has-ctx { grid-template-columns: minmax(0, 1fr) 0 0; }
+  .side {
+    position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); z-index: 45; box-shadow: var(--shadow-pop);
+    translate: -100% 0; visibility: hidden;
+    transition-property: translate, visibility; transition-duration: 300ms; transition-timing-function: var(--ease);
+  }
+  #app.nav-open .side { translate: 0 0; visibility: visible; }
+  .only-mobile { display: inline-flex !important; }
+  .hide-mobile { display: none !important; }
+  .head { padding: 8px 12px; gap: 6px; }
+  .focus { padding: 12px 12px; }
+  .card-scroll { padding: 18px 18px 22px 20px; }
+  .compare { grid-template-columns: 1fr; }
+  .deck-actions .hint { display: none; }
+  .deck-actions { justify-content: space-between; }
+  .row-detail { padding-left: 16px; }
+  .paste { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 1fr) auto; }
+  .paste-ed { border-right: 0; border-bottom: 1px solid var(--color-border-separator); }
+  .pv-list { max-height: 40vh; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .side { translate: 0 0; opacity: 0; transition-property: opacity, visibility; transition-duration: 150ms; }
+  #app.nav-open .side { opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13v1M15 13v1"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.3-4.3"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M3 7v10M21 7v10"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="15" width="7" height="6" rx="1.5"/><path d="M6.5 9v3a3 3 0 003 3h4.5"/></symbol>
+  <symbol id="i-seq" viewBox="0 0 24 24"><path d="M6 3v18M18 3v18"/><path d="M6 8h12l-3-3M18 16H6l3 3"/></symbol>
+  <symbol id="i-spec" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-tracks" viewBox="0 0 24 24"><path d="M6 4v16M18 4v6M18 14v6"/><circle cx="18" cy="12" r="2"/></symbol>
+  <symbol id="i-live" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.7L4 15.5M4 20v-4.5h4.5"/></symbol>
+  <symbol id="i-retry" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></symbol>
+</svg>
+
+<!-- ================= LANDING ================= -->
+<div id="landing">
+  <nav class="l-nav">
+    <span class="brand"><span class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></span>Yak Dai</span>
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost sq" data-act="theme" aria-label="Toggle theme"><svg class="ic"><use href="#i-moon"/></svg></button>
+    <button class="btn btn-ghost" data-act="go-projects">Projects</button>
+    <button class="btn btn-outline trail" data-act="go-new">Open app<svg class="ic"><use href="#i-send"/></svg></button>
+  </nav>
+  <header class="l-hero stagger">
+    <span class="eyebrow">Plan → review → hand off</span>
+    <h1>Review a plan <em>one card at a time</em>, then hand it off.</h1>
+    <p>Paste a markdown plan. Swipe through each task with its diagram and spec beside it. Approve or skip, then hand each task to an agent with one copied prompt.</p>
+    <div class="l-cta">
+      <button class="btn btn-primary lg lead" data-act="go-new"><svg class="ic"><use href="#i-paste"/></svg>Paste a plan</button>
+      <button class="btn btn-outline lg" data-act="go-sample">Try the sample project</button>
+    </div>
+  </header>
+  <section class="l-steps">
+    <div class="surface l-step"><span class="n">01</span><h3>Paste</h3><p>Any plan in the app's format. Wrong format? Copy one prompt, run it through an AI, paste back.</p></div>
+    <div class="surface l-step"><span class="n">02</span><h3>Review</h3><p>Approve or skip in the Focus deck, or scan independent tracks in the List.</p></div>
+    <div class="surface l-step"><span class="n">03</span><h3>Hand off</h3><p>Copy a ready-to-run prompt per task, or a review prompt to check the work once it lands.</p></div>
+  </section>
+  <section class="l-feat">
+    <h2>Everything a reviewer needs, nothing they don't</h2>
+    <div class="l-grid">
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-cards"/></svg></span><h3>Focus deck</h3><p>Drag, click or press ← →. Undo with Z. Jump to any card from the rail.</p></div>
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-tracks"/></svg></span><h3>Independent tracks</h3><p>Tasks split into tracks with no cross-dependencies, so each can be handed off separately.</p></div>
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-flow"/></svg></span><h3>Diagrams that follow you</h3><p>Flowchart and sequence views light up the nodes and messages the current task touches.</p></div>
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-spec"/></svg></span><h3>Structured spec</h3><p>Models, endpoints and interfaces, with the entries a task implements highlighted. Typos show as dashed chips.</p></div>
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-bot"/></svg></span><h3>Agent-ready prompts</h3><p>Copy a do-this-task prompt or a code-review prompt per card. Agents can edit tasks live through the API.</p></div>
+      <div class="surface l-card"><span class="ico"><svg class="ic"><use href="#i-paste"/></svg></span><h3>Saved projects</h3><p>Every review is saved with its approvals. Reopen it from the sidebar or a shared link.</p></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <aside class="side" id="side" aria-label="Projects"></aside>
+  <main class="main">
+    <header class="head" id="head"></header>
+    <div class="body" id="body"></div>
+  </main>
+  <aside class="ctx" id="ctx" aria-label="Diagram and spec"></aside>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<dialog id="confirm">
+  <h3 id="confirm-title"></h3>
+  <p id="confirm-body"></p>
+  <div class="row">
+    <button class="btn btn-ghost" value="cancel" formmethod="dialog" onclick="this.closest('dialog').close('cancel')">Cancel</button>
+    <button class="btn btn-danger lead" onclick="this.closest('dialog').close('ok')"><svg class="ic"><use href="#i-trash"/></svg>Delete</button>
+  </div>
+</dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+// ---------------------------------------------------------------- mock data
+const TASKS_SRC = [
+  { title: 'Add Plan and Subscription models',
+    problem: 'Billing state lives nowhere today, so nothing downstream can tell whether a team is paying.\nScenario: an admin upgrades to Pro, and the app still shows the Free plan because no record of the upgrade exists.',
+    todo: '- Add `Plan` and `Subscription` models in `server/src/models/`\n- Index `Subscription.teamId` (unique) and `stripeCustomerId`\n- Seed Free, Pro and Business plans in `server/src/seed.ts`\n- Expose `getSubscription(teamId)` from `server/src/repositories/billing.ts`',
+    outcome: 'Every team resolves to exactly one plan through one repository call.\nBefore: the upgrade is lost and the UI shows Free.\nAfter: `getSubscription(teamId)` returns Pro with its renewal date.',
+    dependsOn: [], nodes: ['api', 'db'], refs: ['plan', 'subscription'] },
+  { title: 'Create the checkout session endpoint',
+    problem: 'There is no way to start a payment from the app.\nScenario: a team owner clicks Upgrade and nothing happens, because no endpoint creates a Stripe session.',
+    todo: '- Add `POST /api/v1/billing/checkout` in `server/src/v1/routes/billing.ts`\n- Validate `{ planKey }` with a Zod schema in `schemas/billing.ts`\n- Create a Stripe Checkout session with the plan\'s `priceId` and return `{ url }`',
+    outcome: 'Clicking Upgrade lands on Stripe Checkout for the right plan.\nBefore: the button is dead.\nAfter: the owner is redirected to a hosted checkout page for Pro.',
+    dependsOn: [{ title: 'Add Plan and Subscription models', reason: 'needs Plan.priceId to build the line items' }],
+    nodes: ['web', 'api', 'stripe'], refs: ['postCheckout'] },
+  { title: 'Handle Stripe webhooks',
+    problem: 'Payments complete on Stripe but the app never hears about it.\nScenario: checkout succeeds, the card is charged, and the team is still on Free an hour later.',
+    todo: '- Add `POST /api/v1/billing/webhook` with raw-body parsing\n- Verify the signature with `STRIPE_WEBHOOK_SECRET`\n- Upsert `Subscription` on `checkout.session.completed` and `customer.subscription.updated`\n- Make the handler idempotent on `event.id`',
+    outcome: 'Subscription state follows Stripe within seconds.\nBefore: paid teams stay on Free.\nAfter: the Subscription row flips to `active` right after checkout.',
+    dependsOn: [{ title: 'Add Plan and Subscription models', reason: 'writes Subscription rows' }],
+    nodes: ['stripe', 'api', 'db'], refs: ['postWebhook', 'subscription'] },
+  { title: 'Build the billing settings page',
+    problem: 'Admins have nowhere to see or change their plan.\nScenario: an admin wants to download an invoice and has to email support.',
+    todo: '- Add `src/pages/BillingPage.tsx` at `/settings/billing`\n- Show current plan, status and renewal date\n- Upgrade calls checkout; Manage opens the Stripe customer portal via `GET /api/v1/billing/portal`',
+    outcome: 'Admins self-serve every billing change.\nBefore: invoices need a support ticket.\nAfter: Manage billing opens the portal with every invoice listed.',
+    dependsOn: [
+      { title: 'Create the checkout session endpoint', reason: 'the Upgrade button calls it' },
+      { title: 'Handle Stripe webhooks', reason: 'plan status shown here is written by the webhook' }],
+    nodes: ['web', 'api'], refs: ['billingPage', 'getPortal'] },
+  { title: 'Add a usage metering job',
+    problem: 'Usage-based plans need seat and request counts that nobody records.\nScenario: a Business team goes 3× over its quota and is billed the flat rate.',
+    todo: '- Add `worker/meter.ts`, run every 15 minutes\n- Aggregate requests per team into `UsageRecord`\n- Report usage to Stripe with `subscriptionItems.createUsageRecord`',
+    outcome: 'Metered usage reaches Stripe every 15 minutes.\nBefore: overages are invisible.\nAfter: the invoice shows the metered line item.',
+    dependsOn: [], nodes: ['worker', 'db'], refs: ['usageRecord', 'meterJbo'] },
+  { title: 'Emit billing analytics events',
+    problem: 'Growth has no data on upgrades and churn.\nScenario: a PM asks how many teams upgraded last week and nobody can answer.',
+    todo: '- Emit `billing.upgraded`, `billing.downgraded`, `billing.metered` from the worker\n- Send them to the analytics pipeline with the team id and plan key',
+    outcome: 'Billing events land in the analytics dashboard.\nBefore: upgrade counts come from manual Stripe exports.\nAfter: a weekly upgrades chart fills itself.',
+    dependsOn: [{ title: 'Add a usage metering job', reason: 'events carry the metered quantities it produces' }],
+    nodes: ['worker', 'analytics'], refs: ['billingEvents'] },
+  { title: 'Write the plan migration runbook',
+    problem: 'Existing paying customers were invoiced by hand and must move to Stripe.\nScenario: a legacy customer is double-billed during the switch.',
+    todo: '- Export legacy invoices to CSV\n- Create Stripe customers and backdated subscriptions\n- Dry-run on staging first',
+    outcome: '', dependsOn: [], nodes: [], refs: [] },
+]
+const SPEC = {
+  dataModels: [
+    { id: 'plan', name: 'Plan', fields: { key: "'free' | 'pro' | 'business'", priceId: 'string', seats: 'number' } },
+    { id: 'subscription', name: 'Subscription', fields: { teamId: 'ObjectId (unique)', planKey: 'string', status: "'active' | 'past_due' | 'canceled'", renewsAt: 'Date' } },
+    { id: 'usageRecord', name: 'UsageRecord', fields: { teamId: 'ObjectId', metric: 'string', qty: 'number', at: 'Date' } },
+  ],
+  api: [
+    { id: 'postCheckout', name: 'POST /api/v1/billing/checkout', body: '{ planKey }', returns: '{ url }' },
+    { id: 'postWebhook', name: 'POST /api/v1/billing/webhook', body: 'Stripe event (raw)', returns: '204' },
+    { id: 'getPortal', name: 'GET /api/v1/billing/portal', returns: '{ url }' },
+  ],
+  interfaces: [
+    { id: 'billingPage', name: 'BillingSettings', route: '/settings/billing' },
+    { id: 'billingEvents', name: 'billing.* events', emits: 'upgraded, downgraded, metered' },
+  ],
+}
+const NODES = {
+  web: { x: 30, y: 30, label: 'Web app', sub: 'React · Vite' },
+  stripe: { x: 380, y: 30, label: 'Stripe', sub: 'Checkout · Portal' },
+  api: { x: 205, y: 140, label: 'API server', sub: 'Express' },
+  worker: { x: 30, y: 250, label: 'Metering worker', sub: 'cron 15m' },
+  db: { x: 205, y: 250, label: 'MongoDB', sub: 'plans · subs' },
+  analytics: { x: 380, y: 250, label: 'Analytics', sub: 'events' },
+}
+const EDGES = [['web', 'api', 'REST'], ['api', 'stripe', 'session', -7], ['stripe', 'api', 'webhook', -7], ['api', 'db', ''], ['worker', 'db', ''], ['worker', 'analytics', 'events', 0, 'arc']]
+const SEQ_P = ['web', 'api', 'stripe', 'db']
+const SEQ_M = [
+  ['web', 'api', 'POST /billing/checkout'], ['api', 'db', 'find Plan'], ['api', 'stripe', 'create session'],
+  ['stripe', 'web', 'redirect to Checkout'], ['stripe', 'api', 'checkout.session.completed'], ['api', 'db', 'upsert Subscription'],
+  ['web', 'api', 'GET /billing/portal'], ['api', 'stripe', 'create portal session'],
+]
+const now = Date.now(), day = 864e5
+const PROJECTS = [
+  { id: 'p-billing', title: 'Stripe billing for teams', taskCount: 7, doneCount: 2, updatedAt: now - 2 * 36e5, sample: true },
+  { id: 'p-404', title: 'Legacy CSV importer', taskCount: 4, doneCount: 0, updatedAt: now - day, broken: true },
+  ...['Onboarding checklist v2', 'Audit log export', 'SSO with Okta', 'Dark mode polish', 'Search reindex pipeline', 'Rate limits per API key',
+     'Webhooks retry queue', 'Team invites by link', 'Mobile push notifications', 'Usage dashboard', 'Slack digest bot', 'Data retention policies']
+    .map((title, i) => ({ id: 'p' + i, title, taskCount: 4 + (i * 3) % 6, doneCount: (i * 2) % 5, updatedAt: now - (i + 2) * day })),
+].map(p => ({ ...p, doneCount: Math.min(p.doneCount, p.taskCount) }))
+const PAGE_SIZE = 8
+const THROW = 110
+
+// ---------------------------------------------------------------- state
+const S = {
+  screen: 'review', mode: 'focus', pane: 'flow', specRaw: false,
+  title: '', tasks: [], hasDiagram: false, hasSpec: false, projectId: null,
+  done: new Set(), skipped: new Set(), queue: [], history: [], expanded: new Set(), selected: null,
+  page: 1, md: '', sync: 'saved', zoom: 1, pan: { x: 0, y: 0 },
+  enterFrom: null, animating: false,
+}
+
+// ---------------------------------------------------------------- helpers
+const $ = s => document.querySelector(s)
+// file:// and data: pages refuse URL rewrites; the deep link is a nicety, not the demo
+const setUrl = u => { try { history.replaceState(null, '', u) } catch {} }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>')
+const ic = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`
+const pad = n => String(n + 1).padStart(2, '0')
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+const idxByTitle = t => S.tasks.findIndex(x => x.title.trim().toLowerCase() === t.trim().toLowerCase())
+const specIds = () => new Set(Object.values(SPEC).flat().map(e => e.id))
+const active = () => S.screen !== 'review' ? null : S.mode === 'focus' ? (S.queue[0] ?? null) : S.selected
+const ago = t => { const h = (now - t) / 36e5; return h < 24 ? `${Math.max(1, Math.round(h))}h ago` : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }
+
+function withErrors(t) {
+  const errors = []
+  if (!t.problem.trim()) errors.push('Problem')
+  if (!t.todo.trim()) errors.push('What to do')
+  if (!t.outcome.trim()) errors.push('Expected outcome')
+  return { ...t, errors }
+}
+
+// connected components of the dependsOn graph — mirrors shared/groups.ts
+function groupTasks(tasks) {
+  const parent = tasks.map((_, i) => i)
+  const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]))
+  tasks.forEach((t, i) => t.dependsOn.forEach(d => { const j = idxByTitle(d.title); if (j > -1) parent[find(i)] = find(j) }))
+  const groups = new Map()
+  tasks.forEach((_, i) => { const r = find(i); groups.set(r, [...(groups.get(r) || []), i]) })
+  return [...groups.values()].sort((a, b) => a[0] - b[0])
+}
+
+function toMarkdown(title, tasks) {
+  return `# Plan: ${title}\n\n` + tasks.map(t =>
+    `## Task: ${t.title}\n### Problem\n${t.problem}\n### What to do\n${t.todo}\n### Expected outcome\n${t.outcome}\n` +
+    (t.dependsOn.length ? `### Depends on\n${t.dependsOn.map(d => `- ${d.title} — ${d.reason}`).join('\n')}\n` : '')
+  ).join('\n')
+}
+function parsePlan(md) {
+  const title = (md.match(/^# Plan:\s*(.+)$/m) || [])[1] || ''
+  const tasks = md.split(/^## Task:\s*/m).slice(1).map(block => {
+    const [first, ...rest] = block.split('\n')
+    const secs = {}
+    rest.join('\n').split(/^### /m).slice(1).forEach(p => { const [h, ...b] = p.split('\n'); secs[h.trim().toLowerCase()] = b.join('\n').trim() })
+    const dependsOn = (secs['depends on'] || '').split('\n').filter(l => l.startsWith('- ')).map(l => {
+      const [t, r = ''] = l.slice(2).split(/\s+—\s+/); return { title: t.trim(), reason: r.trim() }
+    })
+    return withErrors({ title: first.trim(), problem: secs.problem || '', todo: secs['what to do'] || '', outcome: secs['expected outcome'] || '', dependsOn, nodes: [], refs: [] })
+  })
+  return { title, tasks }
+}
+const taskPrompt = t => `You are implementing one task from the plan "${S.title}".\n\n## ${t.title}\n\n### Problem\n${t.problem}\n\n### What to do\n${t.todo}\n\n### Expected outcome\n${t.outcome}\n`
+const reviewPrompt = t => `Code-review the implementation of this task. Check every step in "What to do" was done and the "After" state holds.\n\n## ${t.title}\n\n### What to do\n${t.todo}\n\n### Expected outcome\n${t.outcome}\n`
+
+async function copy(btn, text) {
+  try { await navigator.clipboard.writeText(text) } catch { /* file:// or denied — the state change still demos */ }
+  btn.classList.add('copied')
+  const label = btn.querySelector('.lbl'); const was = label?.textContent
+  if (label) label.textContent = 'Copied'
+  setTimeout(() => { btn.classList.remove('copied'); if (label) label.textContent = was }, 2000)
+}
+const copyBtn = (act, i, icon, label, cls = 'sm') =>
+  `<button class="btn btn-ghost lead ${cls}" data-act="${act}" data-i="${i}"><span class="swap">${ic(icon)}${ic('check')}</span><span class="lbl">${label}</span></button>`
+
+function toast(msg, kind = 'info', ms = 4000) {
+  const el = document.createElement('div')
+  el.className = `toast ${kind}`
+  el.setAttribute('role', kind === 'err' ? 'alert' : 'status')
+  el.innerHTML = `${ic(kind === 'err' ? 'alert' : 'live')}<span>${esc(msg)}</span><button class="btn btn-ghost sm">Dismiss</button>`
+  const close = () => { el.classList.add('out'); setTimeout(() => el.remove(), 150) }
+  el.querySelector('button').onclick = close
+  $('#toasts').append(el)
+  if (ms) setTimeout(close, ms)
+}
+
+// ---------------------------------------------------------------- theme (transitions suppressed during the swap)
+function setTheme(t) {
+  const kill = document.createElement('style')
+  kill.textContent = '*,*::before,*::after{transition:none!important}'
+  document.head.append(kill)
+  document.documentElement.dataset.theme = t
+  try { localStorage.setItem('yd-theme', t) } catch {}
+  getComputedStyle(document.body).opacity
+  requestAnimationFrame(() => requestAnimationFrame(() => kill.remove()))
+  document.querySelectorAll('[data-act="theme"] use').forEach(u => u.setAttribute('href', t === 'dark' ? '#i-sun' : '#i-moon'))
+}
+{
+  let t; try { t = localStorage.getItem('yd-theme') } catch {}
+  setTheme(t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
+}
+
+// ---------------------------------------------------------------- sync (stands in for the PATCH done-sync)
+let syncTimer
+function markSync() {
+  S.sync = 'syncing'; renderSync()
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => { S.sync = 'saved'; renderSync() }, 650)
+  const p = PROJECTS.find(p => p.id === S.projectId); if (p) { p.doneCount = S.done.size; p.updatedAt = Date.now() }
+}
+function renderSync() {
+  const el = $('#sync'); if (!el) return
+  el.dataset.s = S.sync
+  el.querySelector('span').textContent = S.sync === 'syncing' ? 'Syncing…' : S.sync === 'error' ? 'Not saved' : 'Saved · live'
+  const side = $('#side'); if (side && S.sync === 'saved') renderSide()
+}
+
+// ---------------------------------------------------------------- navigation
+function enterApp() { document.body.classList.add('in-app') }
+function loadProject(p) {
+  if (p.broken) { toast(`Couldn't open "${p.title}" — project not found (404).`, 'err', 0); return }
+  enterApp()
+  S.title = p.title; S.projectId = p.id
+  S.tasks = TASKS_SRC.map(withErrors)
+  S.hasDiagram = true; S.hasSpec = true
+  S.done = new Set(S.tasks.map((_, i) => i).slice(0, Math.min(p.doneCount, 6)))
+  resetReview()
+  S.screen = 'review'; closeNav()
+  renderAll()
+  setUrl(`?project=${p.id}`)
+  scheduleExternalEdit()
+}
+function resetReview() {
+  S.skipped = new Set(); S.history = []; S.expanded = new Set(); S.selected = null
+  S.queue = S.tasks.map((_, i) => i).filter(i => !S.done.has(i))
+  if (!S.queue.length) S.queue = []
+  S.zoom = 1; S.pan = { x: 0, y: 0 }
+}
+function openPaste(prefill = '') {
+  enterApp(); S.screen = 'paste'; S.md = prefill; closeNav(); renderAll()
+  setUrl('?page=new')
+  setTimeout(() => $('#md')?.focus(), 0)
+}
+function startReview() {
+  const { title, tasks } = parsePlan(S.md)
+  const sampleMd = toMarkdown(PROJECTS[0].title, TASKS_SRC)
+  const isSample = S.md.trim() === sampleMd.trim()
+  S.title = title || 'Untitled plan'
+  S.tasks = isSample ? TASKS_SRC.map(withErrors) : tasks
+  S.hasDiagram = isSample; S.hasSpec = isSample  // a pasted plan has no diagram/spec; the planning skill adds them
+  S.done = new Set(); resetReview()
+  const id = 'p-' + Math.random().toString(36).slice(2, 7)
+  PROJECTS.unshift({ id, title: S.title, taskCount: S.tasks.length, doneCount: 0, updatedAt: Date.now() })
+  S.projectId = id; S.page = 1; S.screen = 'review'
+  renderAll(); setUrl(`?project=${id}`)
+}
+
+let extTimer
+function scheduleExternalEdit() {
+  clearTimeout(extTimer)
+  // the real review screen polls every 3 s and re-hydrates on external PATCHes — simulate one
+  extTimer = setTimeout(() => {
+    if (S.screen !== 'review' || !PROJECTS.find(p => p.id === S.projectId)?.sample) return
+    const t = S.tasks[1]; if (!t || t.todo.includes('Stripe-Signature')) return
+    t.todo += '\n- Return `409` when the `planKey` already matches the active Subscription'
+    toast('Task 02 was updated through the API. Changes are shown.', 'info')
+    renderBody(); const el = document.querySelector(`[data-task="1"]`); el?.classList.add('flash')
+  }, 14000)
+}
+
+// ---------------------------------------------------------------- render: sidebar
+function renderSide() {
+  const total = PROJECTS.length, pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  S.page = Math.min(S.page, pages)
+  const items = PROJECTS.slice((S.page - 1) * PAGE_SIZE, S.page * PAGE_SIZE)
+  const first = (S.page - 1) * PAGE_SIZE + 1, last = first + items.length - 1
+  $('#side').innerHTML = `
+    <div class="side-top">
+      <button class="brand" data-act="home" aria-label="Home"><span class="brand-mark">${ic('logo')}</span>Yak Dai</button>
+      <button class="btn btn-outline lead" data-act="go-new" style="width:100%">${ic('plus')}New plan</button>
+    </div>
+    <div class="side-label"><span class="eyebrow">Projects</span><span class="eyebrow num">${total}</span></div>
+    <div class="side-list">
+      ${items.length ? items.map(p => `
+        <div class="proj" aria-current="${p.id === S.projectId && S.screen === 'review'}">
+          <button class="proj-open" data-act="open" data-id="${p.id}">
+            <span class="proj-title">${esc(p.title)}</span>
+            <span class="proj-meta"><span class="mini-bar"><i style="width:${(p.doneCount / p.taskCount) * 100}%"></i></span><span class="num">${p.doneCount}/${p.taskCount}</span><span>·</span><span>${ago(p.updatedAt)}</span></span>
+          </button>
+          <button class="btn btn-ghost sq sm proj-del" data-act="del" data-id="${p.id}" aria-label="Delete ${esc(p.title)}">${ic('trash')}</button>
+        </div>`).join('') : `<p style="padding:24px 8px;color:var(--color-text-secondary);font-size:13px;text-align:center">No saved projects yet. Paste a plan and start a review to create one.</p>`}
+    </div>
+    ${pages > 1 ? `<nav class="side-pager" aria-label="Project pages">
+      <button class="btn btn-ghost sq sm" data-act="page" data-d="-1" ${S.page <= 1 ? 'disabled' : ''} aria-label="Newer">${ic('chev-l')}</button>
+      <span class="eyebrow num">${first}–${last} of ${total}</span>
+      <button class="btn btn-ghost sq sm" data-act="page" data-d="1" ${S.page >= pages ? 'disabled' : ''} aria-label="Older">${ic('chev-r')}</button>
+    </nav>` : ''}
+    <div class="side-foot">
+      <span class="api-dot" title="API on :3001 · MongoDB connected"><i></i>API connected</span>
+      <button class="btn btn-ghost sq" data-act="theme" aria-label="Toggle theme">${ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
+    </div>`
+}
+
+// ---------------------------------------------------------------- render: header
+function renderHead() {
+  const h = $('#head')
+  const menu = `<button class="btn btn-ghost sq only-mobile" data-act="nav" aria-label="Open projects">${ic('menu')}</button>`
+  if (S.screen === 'paste') {
+    h.innerHTML = `${menu}<h1>New plan</h1><span class="grow"></span>
+      ${S.projectId ? `<button class="btn btn-ghost lead" data-act="back-review">${ic('chev-l')}Back to review</button>` : ''}`
+    return
+  }
+  h.innerHTML = `${menu}
+    <h1 title="${esc(S.title)}">${esc(S.title)}</h1>
+    <span class="sync hide-mobile" id="sync" data-s="${S.sync}"><i></i><span></span></span>
+    <span class="grow"></span>
+    <div class="seg" role="tablist" aria-label="Review mode">
+      <button role="tab" aria-selected="${S.mode === 'focus'}" data-act="mode" data-m="focus" title="Focus (F)">${ic('cards')}<span class="hide-mobile">Focus</span></button>
+      <button role="tab" aria-selected="${S.mode === 'list'}" data-act="mode" data-m="list" title="List (L)">${ic('list')}<span class="hide-mobile">List</span></button>
+    </div>
+    <button class="btn btn-ghost sq only-narrow" data-act="ctx" aria-label="Show diagram and spec">${ic('panel')}</button>
+    <button class="btn btn-ghost sq hide-mobile" data-act="edit-md" aria-label="Edit as markdown" title="Edit as markdown">${ic('edit')}</button>
+    <button class="btn btn-ghost sq hide-mobile" data-act="copy-link" aria-label="Copy deep link" title="Copy link to this project"><span class="swap">${ic('link')}${ic('check')}</span></button>`
+  renderSync()
+}
+
+// ---------------------------------------------------------------- render: task content (shared by card + list row)
+function taskBody(t, i, where) {
+  const known = specIds()
+  const [probText, scenario] = splitLine(t.problem, 'Scenario')
+  const outLines = t.outcome.split('\n')
+  const before = (outLines.find(l => l.startsWith('Before:')) || '').slice(7).trim()
+  const after = (outLines.find(l => l.startsWith('After:')) || '').slice(6).trim()
+  const outText = outLines.filter(l => !/^(Before|After):/.test(l)).join(' ')
+  const steps = t.todo.split('\n').filter(Boolean)
+  const deps = t.dependsOn.map(d => {
+    const j = idxByTitle(d.title), ok = j > -1 && S.done.has(j)
+    return `<div class="dep">${j > -1
+      ? `<button class="chip ${ok ? 'ok' : ''}" data-act="jump" data-i="${j}" title="${esc(d.reason)}">${ic(ok ? 'check' : 'chev-r')}${pad(j)} · ${esc(d.title)}</button>`
+      : `<span class="chip warn" title="No task with this title">${esc(d.title)}</span>`}
+      <span class="why">${esc(d.reason)}</span></div>`
+  }).join('')
+  const refs = t.refs.map(r => known.has(r)
+    ? `<button class="chip code accent" data-act="spec-ref" data-r="${esc(r)}">${ic('code')}${esc(r)}</button>`
+    : `<span class="chip code warn" title="No spec entry named “${esc(r)}”">${ic('alert')}${esc(r)}</span>`).join('')
+  return `
+    ${(deps || refs) ? `<div class="refs">
+      ${deps ? `<div class="ref-row"><span class="k">Depends on</span><div class="v" style="flex-direction:column;gap:6px">${deps}</div></div>` : ''}
+      ${refs ? `<div class="ref-row"><span class="k">Implements</span><div class="v">${refs}</div></div>` : ''}
+    </div>` : ''}
+    ${t.errors.length ? `<div class="callout warn">${ic('alert')}<span>Missing ${t.errors.join(', ')}. Fill it in before handing it off.</span></div>` : ''}
+    <div class="secs">
+      <section class="sec"><h4>Problem</h4><p>${inline(probText)}</p>
+        ${scenario ? `<div class="scenario"><b>Scenario</b> · ${inline(scenario)}</div>` : ''}</section>
+      <section class="sec"><h4>What to do</h4>
+        ${steps.length ? `<ol class="steps">${steps.map(s => `<li><span>${inline(s.replace(/^[-*]\s+|^\d+\.\s+/, ''))}</span></li>`).join('')}</ol>` : `<p style="color:var(--color-text-tertiary)">—</p>`}</section>
+      <section class="sec"><h4>Expected outcome</h4>
+        <p>${outText ? inline(outText) : '<span style="color:var(--color-text-tertiary)">Not written yet</span>'}</p>
+        ${before || after ? `<div class="compare"><div class="b"><b>Before</b>${inline(before)}</div><div class="a"><b>After</b>${inline(after)}</div></div>` : ''}</section>
+    </div>`
+}
+function splitLine(text, key) {
+  const lines = text.split('\n'), hit = lines.find(l => l.startsWith(key + ':'))
+  return [lines.filter(l => l !== hit).join(' '), hit ? hit.slice(key.length + 1).trim() : '']
+}
+
+// ---------------------------------------------------------------- render: focus deck
+function renderFocus() {
+  const n = S.tasks.length, d = S.done.size, s = S.skipped.size
+  const top = S.queue[0]
+  const STATE = { top: 'current', done: 'approved', skip: 'skipped', '': 'not reviewed' }
+  const rail = S.tasks.map((t, i) => {
+    const st = i === top ? 'top' : S.done.has(i) ? 'done' : S.skipped.has(i) ? 'skip' : ''
+    return `<button data-act="jump" data-i="${i}" data-st="${st}" aria-label="Task ${i + 1}, ${STATE[st]}: ${esc(t.title)}" title="${pad(i)} · ${STATE[st]} · ${esc(t.title)}"><i></i></button>`
+  }).join('')
+  const head = `
+    <div class="progress">
+      <div class="bar"><i class="d" style="width:${(d / n) * 100}%"></i><i class="s" style="width:${(s / n) * 100}%"></i></div>
+      <span class="progress-txt num"><b>${d}</b>/${n} approved${s ? ` · ${s} skipped` : ''}</span>
+    </div>
+    <div class="rail" role="group" aria-label="Tasks">${rail}</div>`
+  if (top === undefined) {
+    const all = d === n
+    return `<div class="focus">${head}<div class="end"><div class="end-inner stagger">
+      <span class="end-badge">${ic(all ? 'check' : 'cards')}</span>
+      <h2>${all ? 'All approved' : 'Review finished'}</h2>
+      <p class="num">${d} approved · ${s} skipped</p>
+      <div class="row">
+        ${s ? `<button class="btn btn-primary lg lead" data-act="replay">${ic('retry')}Replay ${s} skipped</button>` : ''}
+        <button class="btn btn-ghost lg" data-act="restart">Start over</button>
+        ${S.history.length ? `<button class="btn btn-ghost lg lead" data-act="undo">${ic('undo')}Undo last</button>` : ''}
+      </div></div></div></div>`
+  }
+  const t = S.tasks[top]
+  const track = groupTasks(S.tasks).findIndex(g => g.includes(top))
+  const ghosts = S.queue.slice(1, 3).map((_, k) => `<div class="card ghost g${k + 1}" aria-hidden="true"></div>`).reverse().join('')
+  return `<div class="focus">${head}
+    <div class="deck" id="deck">${ghosts}
+      <article class="card top" id="topcard" data-task="${top}" aria-label="Task ${top + 1}: ${esc(t.title)}">
+        <div class="stamp yes">Approve</div><div class="stamp no">Skip</div>
+        <div class="card-scroll">
+          <div class="card-top">
+            <span class="tag"><span class="dot"></span>${pad(top)} / ${pad(n - 1)}</span>
+            <span class="chip">${ic('tracks')}Track ${track + 1}</span>
+            ${S.done.has(top) ? `<span class="chip ok">${ic('check')}Approved</span>` : ''}
+            <span class="grow"></span>
+            ${copyBtn('copy-prompt', top, 'bot', 'Copy prompt')}
+            ${copyBtn('copy-review', top, 'review', 'Copy review')}
+          </div>
+          <h2>${esc(t.title)}</h2>
+          ${taskBody(t, top, 'card')}
+        </div>
+      </article>
+    </div>
+    <div class="deck-actions">
+      <button class="btn btn-ghost lg lead" data-act="undo" ${S.history.length ? '' : 'disabled'}>${ic('undo')}Undo</button>
+      <span class="hint">Drag the card or press <kbd>←</kbd> <kbd>→</kbd> · <kbd>Z</kbd> undo</span>
+      <button class="btn btn-skip lg lead" data-act="skip">${ic('x')}Skip</button>
+      <button class="btn btn-approve lg lead" data-act="approve">${ic('check')}Approve</button>
+    </div></div>`
+}
+
+// ---------------------------------------------------------------- render: list
+function renderList() {
+  const n = S.tasks.length, d = S.done.size
+  const tracks = groupTasks(S.tasks)
+  const row = i => {
+    const t = S.tasks[i], open = S.expanded.has(i)
+    return `<div class="row ${S.selected === i ? 'sel' : ''}" data-task="${i}" data-done="${S.done.has(i)}" aria-expanded="${open}">
+      <div class="row-line">
+        <button class="check" role="checkbox" aria-checked="${S.done.has(i)}" data-act="toggle" data-i="${i}" aria-label="Approve ${esc(t.title)}">${ic('check')}</button>
+        <button class="row-main" data-act="row" data-i="${i}" aria-expanded="${open}">
+          <span class="n">${pad(i)}</span><span class="t">${esc(t.title)}</span>
+          <span class="meta hide-mobile">
+            ${t.errors.length ? `<span class="chip warn">${ic('alert')}incomplete</span>` : ''}
+            ${t.dependsOn.length ? `<span class="chip">${ic('flow')}${t.dependsOn.length}</span>` : ''}
+          </span>
+          ${ic('chev-d', 'chev')}
+        </button>
+      </div>
+      ${open ? `<div class="row-detail">
+        <div class="tools">${copyBtn('copy-prompt', i, 'bot', 'Copy prompt')}${copyBtn('copy-review', i, 'review', 'Copy review')}</div>
+        ${taskBody(t, i, 'list')}</div>` : ''}
+    </div>`
+  }
+  return `<div class="list">
+    <div class="progress">
+      <div class="bar"><i class="d" style="width:${(d / n) * 100}%"></i></div>
+      <span class="progress-txt num"><b>${d}</b>/${n} approved</span>
+      <button class="btn btn-ghost sm" data-act="expand-all">${S.expanded.size ? 'Collapse all' : 'Expand all'}</button>
+    </div>
+    ${tracks.map((tr, ti) => `<section>
+      ${tracks.length > 1 ? `<div class="track-head"><span class="eyebrow">Track ${ti + 1}</span><span class="note num">${tr.filter(i => S.done.has(i)).length}/${tr.length} approved</span>
+        ${ti === 0 ? `<span class="note" style="margin-left:auto">Tracks share no dependencies, so each can go to a different person</span>` : ''}</div>` : ''}
+      <div class="surface track">${tr.map(row).join('')}</div>
+    </section>`).join('')}
+  </div>`
+}
+
+// ---------------------------------------------------------------- render: paste
+function renderPaste() {
+  const { tasks } = parsePlan(S.md)
+  const bad = tasks.filter(t => t.errors.length).length
+  const mismatch = S.md.trim() && !tasks.length
+  return `<div class="paste">
+    <div class="paste-ed">
+      <div class="paste-bar">
+        <span class="eyebrow">Markdown</span><span class="grow" style="flex:1"></span>
+        <button class="btn btn-ghost sm" data-act="sample">Load sample</button>
+        <button class="btn btn-ghost sm" data-act="clear" ${S.md ? '' : 'disabled'}>Clear</button>
+      </div>
+      <label for="md" class="sr">Plan markdown</label>
+      <textarea id="md" spellcheck="false" placeholder="# Plan: title&#10;&#10;## Task: task title&#10;### Problem&#10;### What to do&#10;### Expected outcome&#10;### Depends on (optional)">${esc(S.md)}</textarea>
+    </div>
+    <div class="paste-pv" id="pv">${pvInner(tasks, bad, mismatch)}</div>
+  </div>`
+}
+function pvInner(tasks, bad, mismatch) {
+  return `
+    <div class="paste-bar"><span class="eyebrow">Preview</span></div>
+    ${mismatch ? `<div style="flex:1"><div class="surface mismatch">
+        <h3>${ic('alert')}This plan isn't in the app's format</h3>
+        <p>Copy the prompt below. It already includes your plan. Paste it into any AI and paste the result back here.</p>
+        <div>${copyBtn('copy-format', 0, 'copy', 'Copy AI format prompt + my plan', '')}</div>
+      </div></div>` : tasks.length ? `<div class="pv-list">${tasks.map((t, i) => `
+        <div class="surface pv-item ${t.errors.length ? 'bad' : ''}">
+          <span class="n">${pad(i)}</span><span class="t">${esc(t.title)}</span>
+          ${t.errors.length ? `<span class="chip warn">missing ${t.errors.join(', ')}</span>` : t.dependsOn.length ? `<span class="chip">${ic('flow')}${t.dependsOn.length}</span>` : ''}
+        </div>`).join('')}</div>`
+      : `<div class="pv-empty"><span class="ico">${ic('paste')}</span><b style="color:var(--color-text-primary)">Paste a plan to see its tasks</b><span style="font-size:13px">Each <code>## Task:</code> becomes one card. Or load the sample to look around.</span></div>`}
+    <div class="pv-foot">
+      ${tasks.length ? `<span class="chip num">${tasks.length} task${tasks.length === 1 ? '' : 's'}${bad ? ` · ${bad} incomplete` : ''}</span>` : ''}
+      <span style="flex:1"></span>
+      <button class="btn btn-primary trail" data-act="start" ${tasks.length ? '' : 'disabled'}>Start review${ic('send')}</button>
+    </div>`
+}
+
+// ---------------------------------------------------------------- render: context pane
+function renderCtx() {
+  const app = $('#app')
+  const has = S.screen === 'review' && (S.hasDiagram || S.hasSpec)
+  app.classList.toggle('has-ctx', has)
+  if (!has) { $('#ctx').innerHTML = ''; return }
+  if (!S.hasDiagram && S.pane !== 'spec') S.pane = 'spec'
+  const a = active()
+  const tabs = [S.hasDiagram && ['flow', 'flow', 'Flowchart'], S.hasDiagram && ['seq', 'seq', 'Sequence'], S.hasSpec && ['spec', 'spec', 'Spec']].filter(Boolean)
+  $('#ctx').innerHTML = `
+    <div class="ctx-head">
+      ${tabs.length > 1 ? `<div class="seg" role="tablist" aria-label="Context view">${tabs.map(([k, i, l]) =>
+        `<button role="tab" aria-selected="${S.pane === k}" data-act="pane" data-p="${k}">${ic(i)}${l}</button>`).join('')}</div>` : ''}
+      <span style="flex:1"></span>
+      ${S.pane === 'spec' ? `<button class="btn btn-ghost sm" data-act="raw" aria-pressed="${S.specRaw}">${S.specRaw ? 'Rendered' : 'Raw JSON'}</button>` : ''}
+      <button class="btn btn-ghost sq only-narrow" data-act="ctx" aria-label="Close panel">${ic('x')}</button>
+    </div>
+    <div class="ctx-focus">
+      ${a != null ? `<span class="dot"></span><span>Highlighting</span><b>${pad(a)} · ${esc(S.tasks[a].title)}</b>`
+        : `<span>${S.mode === 'list' ? 'Select a task to highlight what it touches' : 'Nothing to highlight'}</span>`}
+    </div>
+    ${S.pane === 'spec' ? `<div class="spec" id="spec">${specInner(a)}</div>` : `
+      <div class="vp ${S.zoom > 1 ? 'pannable' : ''}" id="vp">
+        <div class="stage" id="stage" style="transform:translate(${S.pan.x}px,${S.pan.y}px) scale(${S.zoom})">${S.pane === 'seq' ? seqSVG(a) : flowSVG(a)}</div>
+        <div class="zoom">
+          <button class="btn btn-ghost sq" data-act="zoom" data-z="-1" ${S.zoom <= 1 ? 'disabled' : ''} aria-label="Zoom out">${ic('minus')}</button>
+          <span class="num">${Math.round(S.zoom * 100)}%</span>
+          <button class="btn btn-ghost sq" data-act="zoom" data-z="1" ${S.zoom >= 4 ? 'disabled' : ''} aria-label="Zoom in">${ic('plus')}</button>
+          <button class="btn btn-ghost sq" data-act="zoom" data-z="0" ${S.zoom === 1 ? 'disabled' : ''} aria-label="Fit to panel">${ic('fit')}</button>
+        </div>
+      </div>`}`
+}
+function hlSet(a) { return new Set(a != null ? S.tasks[a].nodes : []) }
+function flowSVG(a) {
+  const W = 140, H = 50, hl = hlSet(a)
+  const c = k => ({ x: NODES[k].x + W / 2, y: NODES[k].y + H / 2 })
+  const clip = (from, to) => {   // where the centre-to-centre line leaves the box
+    const dx = to.x - from.x, dy = to.y - from.y
+    const t = Math.min(dx ? (W / 2 + 4) / Math.abs(dx) : 1e9, dy ? (H / 2 + 4) / Math.abs(dy) : 1e9)
+    return { x: from.x + dx * t, y: from.y + dy * t }
+  }
+  const edges = EDGES.map(([f, to, lbl, off = 0, arc]) => {
+    let A = c(f), B = c(to), nx = 0, ny = 0
+    if (off) { const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy); nx = -dy / L; ny = dx / L; A = { x: A.x + nx * off, y: A.y + ny * off }; B = { x: B.x + nx * off, y: B.y + ny * off } }
+    let path, mid
+    if (arc) {
+      const p = { x: A.x, y: A.y + H / 2 }, q = { x: B.x, y: B.y + H / 2 + 4 }
+      path = `M${p.x},${p.y} C${p.x},${p.y + 70} ${q.x},${q.y + 70} ${q.x},${q.y}`; mid = { x: (p.x + q.x) / 2, y: p.y + 56 }
+    } else {
+      const p = clip(A, B), q = clip(B, A); path = `M${p.x},${p.y} L${q.x},${q.y}`; mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }
+    }
+    const on = hl.has(f) && hl.has(to)
+    return `<g class="e ${on ? 'hl' : ''}"><path class="e-line" d="${path}" marker-end="url(#ah${on ? 'h' : ''})"/>${lbl ? `<text class="e-lbl" text-anchor="middle" x="${mid.x + nx * off * 3 + (off ? 0 : 22)}" y="${mid.y + ny * off * 3 + (off ? 4 : -4)}">${lbl}</text>` : ''}</g>`
+  }).join('')
+  const nodes = Object.entries(NODES).map(([k, n]) => `<g class="n ${hl.has(k) ? 'hl' : ''}">
+      <rect class="n-box" x="${n.x}" y="${n.y}" width="${W}" height="${H}" rx="10"/>
+      <text class="n-lbl" x="${n.x + 14}" y="${n.y + 22}">${n.label}</text><text class="n-sub" x="${n.x + 14}" y="${n.y + 38}">${n.sub}</text></g>`).join('')
+  return `<svg viewBox="0 0 550 380" class="${hl.size ? 'has-hl' : ''}" role="img" aria-label="Architecture flowchart">
+    <defs>${['', 'h'].map(s => `<marker id="ah${s}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" stroke="${s ? 'var(--color-accent-text)' : 'var(--color-border-strong)'}" stroke-width="1.5"/></marker>`).join('')}</defs>
+    ${edges}${nodes}</svg>`
+}
+function seqSVG(a) {
+  const hl = hlSet(a), X = k => 70 + SEQ_P.indexOf(k) * 137, top = 16, y0 = 84, step = 40
+  const Hh = y0 + SEQ_M.length * step + 10
+  const parts = SEQ_P.map(k => `<g class="n ${hl.has(k) ? 'hl' : ''}">
+      <line class="life" x1="${X(k)}" y1="${top + 40}" x2="${X(k)}" y2="${Hh}"/>
+      <rect class="n-box" x="${X(k) - 56}" y="${top}" width="112" height="40" rx="10"/>
+      <text class="n-lbl" x="${X(k)}" y="${top + 25}" text-anchor="middle">${NODES[k].label}</text></g>`).join('')
+  const msgs = SEQ_M.map(([f, t, l], i) => {
+    const y = y0 + i * step, on = hl.has(f) && hl.has(t), dir = X(t) > X(f) ? 1 : -1
+    return `<g class="m ${on ? 'hl' : ''}"><path class="e-line" d="M${X(f) + dir * 4},${y} L${X(t) - dir * 6},${y}" marker-end="url(#sh${on ? 'h' : ''})"/>
+      <text class="e-lbl" x="${(X(f) + X(t)) / 2}" y="${y - 7}" text-anchor="middle">${l}</text></g>`
+  }).join('')
+  return `<svg viewBox="0 0 550 ${Hh + 6}" class="${hl.size ? 'has-hl' : ''}" role="img" aria-label="Sequence diagram">
+    <defs>${['', 'h'].map(s => `<marker id="sh${s}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1,1 L9,5 L1,9" fill="none" stroke="${s ? 'var(--color-accent-text)' : 'var(--color-border-strong)'}" stroke-width="1.5"/></marker>`).join('')}</defs>
+    ${parts}${msgs}</svg>`
+}
+function specInner(a) {
+  if (S.specRaw) return `<div class="surface"><pre class="raw">${esc(JSON.stringify(SPEC, null, 2))}</pre></div>`
+  const hl = new Set(a != null ? S.tasks[a].refs : [])
+  return `<div class="${[...hl].some(r => specIds().has(r)) ? 'has-hl' : ''}" style="display:flex;flex-direction:column;gap:18px">${Object.entries(SPEC).map(([sec, entries]) => `
+    <section class="spec-sec"><span class="eyebrow">${sec.replace(/([A-Z])/g, ' $1')}</span>
+      <div class="spec-entries">${entries.map(e => {
+        const { id, name, fields, ...rest } = e
+        const kv = { ...(fields || {}), ...rest }
+        return `<div class="entry ${hl.has(id) ? 'hl' : ''}" id="spec-${id}">
+          <div class="entry-h"><span class="chip code ${hl.has(id) ? 'accent' : ''}">${id}</span><b>${esc(name || '')}</b></div>
+          <dl class="kv">${Object.entries(kv).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`
+      }).join('')}</div></section>`).join('')}</div>`
+}
+
+// ---------------------------------------------------------------- render orchestration
+function renderBody() {
+  $('#body').innerHTML = S.screen === 'paste' ? renderPaste() : S.mode === 'focus' ? renderFocus() : renderList()
+  if (S.screen === 'review' && S.mode === 'focus') bindDeck()
+}
+function renderAll() { renderSide(); renderHead(); renderBody(); renderCtx() }
+function afterChange() { renderHead(); renderBody(); renderCtx() }
+
+// ---------------------------------------------------------------- deck mechanics
+function bindDeck() {
+  const card = $('#topcard'); if (!card) return
+  if (S.enterFrom) {
+    const dir = S.enterFrom === 'right' ? 1 : -1; S.enterFrom = null
+    if (reduced()) { card.style.opacity = '0'; requestAnimationFrame(() => { card.style.transition = 'opacity 150ms ease-out'; card.style.opacity = '1' }) }
+    else {
+      card.style.transform = `translateX(${dir * 520}px) rotate(${dir * 10}deg)`
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        card.style.transition = 'transform 360ms cubic-bezier(0.2, 0, 0, 1)'; card.style.transform = ''
+      }))
+    }
+  }
+  let x0 = 0, dx = 0, id = null, moved = false
+  const yes = card.querySelector('.stamp.yes'), no = card.querySelector('.stamp.no')
+  card.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || S.animating || e.target.closest?.('button, a')) return
+    id = e.pointerId; x0 = e.clientX; dx = 0; moved = false
+    card.setPointerCapture(id); card.style.transition = 'none'
+  })
+  card.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return
+    dx = e.clientX - x0
+    if (!moved && Math.abs(dx) > 6) { moved = true; card.classList.add('dragging'); getSelection()?.removeAllRanges() }
+    if (!moved) return
+    card.style.transform = reduced() ? `translateX(${dx * 0.25}px)` : `translateX(${dx}px) rotate(${dx / 22}deg)`
+    yes.style.opacity = Math.max(0, Math.min(1, dx / THROW)); no.style.opacity = Math.max(0, Math.min(1, -dx / THROW))
+  })
+  const end = e => {
+    if (e.pointerId !== id) return
+    id = null; card.classList.remove('dragging')
+    if (moved && Math.abs(dx) > THROW) return commit(dx > 0 ? 'right' : 'left', dx)
+    card.style.transition = 'transform 300ms cubic-bezier(0.2, 0, 0, 1)'; card.style.transform = ''
+    yes.style.opacity = no.style.opacity = 0
+  }
+  card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end)
+}
+function commit(dir, fromDx = 0) {
+  const card = $('#topcard'); if (!card || S.animating) return
+  S.animating = true
+  const sign = dir === 'right' ? 1 : -1
+  card.querySelector(dir === 'right' ? '.stamp.yes' : '.stamp.no').style.opacity = 1
+  if (reduced()) { card.style.transition = 'opacity 150ms ease-out'; card.style.opacity = '0' }
+  else {
+    // a thrown card keeps travelling the way it was thrown, from wherever the drag ended
+    const dist = Math.max(900, Math.abs(fromDx) + 700)
+    card.style.transition = 'transform 340ms cubic-bezier(0.2, 0, 0, 1), opacity 340ms ease-out'
+    card.style.transform = `translateX(${sign * dist}px) rotate(${sign * 24}deg)`; card.style.opacity = '0'
+  }
+  setTimeout(() => {
+    const i = S.queue.shift()
+    S.history.push({ i, dir, wasDone: S.done.has(i), wasSkipped: S.skipped.has(i) })
+    if (dir === 'right') { S.done.add(i); S.skipped.delete(i) } else { S.skipped.add(i); S.done.delete(i) }
+    S.animating = false; markSync(); afterChange()
+  }, reduced() ? 150 : 340)
+}
+function undo() {
+  const last = S.history.pop(); if (!last || S.animating) return
+  S.queue = [last.i, ...S.queue.filter(x => x !== last.i)]
+  last.wasDone ? S.done.add(last.i) : S.done.delete(last.i)
+  last.wasSkipped ? S.skipped.add(last.i) : S.skipped.delete(last.i)
+  S.enterFrom = last.dir; markSync(); afterChange()
+}
+function jump(i) {
+  if (S.mode === 'list') { S.selected = i; S.expanded.add(i); afterChange(); document.querySelector(`[data-task="${i}"]`)?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); return }
+  S.queue = [i, ...S.queue.filter(x => x !== i)]
+  S.skipped.delete(i)
+  afterChange()
+}
+
+// ---------------------------------------------------------------- overlays
+function closeNav() { $('#app').classList.remove('nav-open', 'ctx-open'); $('#scrim').classList.remove('on') }
+
+// ---------------------------------------------------------------- events
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-act]'); if (!b) return
+  const act = b.dataset.act, i = +b.dataset.i
+  switch (act) {
+    case 'theme': return setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark')
+    case 'home': document.body.classList.remove('in-app'); setUrl(location.pathname); return
+    case 'go-new': return openPaste('')
+    case 'go-projects': enterApp(); S.projectId ? renderAll() : loadProject(PROJECTS[0]); $('#app').classList.add('nav-open'); return
+    case 'go-sample': return loadProject(PROJECTS[0])
+    case 'open': return loadProject(PROJECTS.find(p => p.id === b.dataset.id))
+    case 'del': {
+      const p = PROJECTS.find(p => p.id === b.dataset.id), dlg = $('#confirm')
+      $('#confirm-title').textContent = `Delete “${p.title}”?`
+      $('#confirm-body').textContent = `This removes the project and its ${p.taskCount} task${p.taskCount === 1 ? '' : 's'}.`
+      dlg.showModal()
+      dlg.onclose = () => {
+        if (dlg.returnValue !== 'ok') return
+        PROJECTS.splice(PROJECTS.indexOf(p), 1)
+        if (S.projectId === p.id) { S.projectId = null; openPaste('') } else renderSide()
+      }
+      return
+    }
+    case 'page': S.page += +b.dataset.d; return renderSide()
+    case 'nav': $('#app').classList.add('nav-open'); $('#scrim').classList.add('on'); return
+    case 'ctx': { const on = $('#app').classList.toggle('ctx-open'); $('#scrim').classList.toggle('on', on); return }
+    case 'mode': S.mode = b.dataset.m; return afterChange()
+    case 'pane': S.pane = b.dataset.p; return renderCtx()
+    case 'raw': S.specRaw = !S.specRaw; return renderCtx()
+    case 'zoom': {
+      const z = +b.dataset.z
+      S.zoom = z === 0 ? 1 : Math.min(4, Math.max(1, +(S.zoom + z * 0.25).toFixed(2)))
+      if (S.zoom === 1) S.pan = { x: 0, y: 0 }
+      return renderCtx()
+    }
+    case 'approve': return commit('right')
+    case 'skip': return commit('left')
+    case 'undo': return undo()
+    case 'jump': return jump(i)
+    case 'replay': S.queue = [...S.skipped].sort((a, b) => a - b); S.skipped = new Set(); S.history = []; return afterChange()
+    case 'restart': S.done = new Set(); resetReview(); markSync(); return afterChange()
+    case 'toggle': S.done.has(i) ? S.done.delete(i) : S.done.add(i); S.queue = S.tasks.map((_, k) => k).filter(k => !S.done.has(k)); markSync(); return afterChange()
+    case 'row': S.selected = i; S.expanded.has(i) ? S.expanded.delete(i) : S.expanded.add(i); return afterChange()
+    case 'expand-all': S.expanded = S.expanded.size ? new Set() : new Set(S.tasks.map((_, k) => k)); return renderBody()
+    case 'spec-ref': {
+      S.pane = 'spec'; S.specRaw = false; renderCtx()
+      if (getComputedStyle($('#ctx')).position === 'fixed') { $('#app').classList.add('ctx-open'); $('#scrim').classList.add('on') }
+      const el = document.getElementById('spec-' + b.dataset.r)
+      el?.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' }); el?.classList.add('ping')
+      return
+    }
+    case 'copy-prompt': return copy(b, taskPrompt(S.tasks[i]))
+    case 'copy-review': return copy(b, reviewPrompt(S.tasks[i]))
+    case 'copy-format': return copy(b, 'Reformat the plan below into EXACTLY this markdown structure…\n\n' + S.md)
+    case 'copy-link': return copy(b, `${location.origin}/?project=${S.projectId}`)
+    case 'edit-md': S.md = toMarkdown(S.title, S.tasks); S.screen = 'paste'; return renderAll()
+    case 'back-review': S.screen = 'review'; return renderAll()
+    case 'sample': S.md = toMarkdown(PROJECTS[0].title, TASKS_SRC); return renderAll()
+    case 'clear': S.md = ''; return renderAll()
+    case 'start': return startReview()
+  }
+})
+document.addEventListener('input', e => {
+  if (e.target.id === 'md') {
+    S.md = e.target.value   // keep the textarea itself; re-render only the preview so the caret stays put
+    const { tasks } = parsePlan(S.md)
+    $('#pv').innerHTML = pvInner(tasks, tasks.filter(t => t.errors.length).length, S.md.trim() && !tasks.length)
+    $('[data-act="clear"]').disabled = !S.md
+  }
+})
+$('#scrim').addEventListener('click', closeNav)
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeNav(); return }
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable]')
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || !document.body.classList.contains('in-app') || S.screen !== 'review') return
+  if ($('#confirm').open) return
+  if (e.key === 'f') { S.mode = 'focus'; return afterChange() }
+  if (e.key === 'l') { S.mode = 'list'; return afterChange() }
+  if (S.mode !== 'focus') return
+  if (e.key === 'ArrowRight' && S.queue.length) { e.preventDefault(); commit('right') }
+  if (e.key === 'ArrowLeft' && S.queue.length) { e.preventDefault(); commit('left') }
+  if (e.key === 'ArrowUp' || e.key === 'z') { e.preventDefault(); undo() }
+})
+
+// diagram pan (when zoomed) and pinch / ctrl-wheel zoom
+let pan = null
+document.addEventListener('pointerdown', e => {
+  const vp = e.target.closest?.('#vp'); if (!vp || S.zoom <= 1 || e.target.closest?.('.zoom')) return
+  pan = { x: e.clientX - S.pan.x, y: e.clientY - S.pan.y, id: e.pointerId }; vp.setPointerCapture(e.pointerId); vp.classList.add('panning')
+})
+document.addEventListener('pointermove', e => {
+  if (!pan || e.pointerId !== pan.id) return
+  S.pan = { x: e.clientX - pan.x, y: e.clientY - pan.y }
+  $('#stage').style.transform = `translate(${S.pan.x}px,${S.pan.y}px) scale(${S.zoom})`
+})
+document.addEventListener('pointerup', () => { pan = null; $('#vp')?.classList.remove('panning') })
+document.addEventListener('wheel', e => {
+  if (!e.ctrlKey || !e.target.closest?.('#vp')) return   // plain two-finger swipe stays a scroll
+  e.preventDefault()
+  S.zoom = Math.min(4, Math.max(1, +(S.zoom - e.deltaY * 0.01).toFixed(2)))
+  if (S.zoom === 1) S.pan = { x: 0, y: 0 }
+  renderCtx()
+}, { passive: false })
+
+// ---------------------------------------------------------------- boot: honour the app's deep links
+{
+  const q = new URLSearchParams(location.search)
+  const pid = q.get('project')
+  if (pid) loadProject(PROJECTS.find(p => p.id === pid) || PROJECTS[0])
+  else if (q.get('page') === 'new') openPaste('')
+  else if (q.get('page') === 'projects') { loadProject(PROJECTS[0]); $('#app').classList.add('nav-open') }
+}
+</script>
+</body>
+</html>

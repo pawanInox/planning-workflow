@@ -1,293 +1,210 @@
-import { memo, useState } from 'react'
-import { taskToPrompt, taskToReviewPrompt } from '../../shared/parse'
-import type { Task } from '../../shared/parse'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
+import { resolveDepIndex, taskToPrompt, taskToReviewPrompt, type Task } from '../../shared/parse'
+import { Icon, type IconName } from './Icon'
+import { pad } from '../lib/ui'
 
-function CopyButton({ label, title, text }: { label: string; title: string; text: () => string }) {
+export function CopyButton({ icon, label, title, text, className = 'sm', iconOnly = false }: {
+  icon: IconName; label: string; title: string; text: () => string; className?: string
+  /** square icon button; the label becomes its accessible name */
+  iconOnly?: boolean
+}) {
   const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(timer.current), [])
   return (
     <button
-      className="btn-ghost"
-      style={{ height: 28, fontSize: 12, padding: '0 10px', whiteSpace: 'nowrap' }}
+      className={`btn btn-ghost ${iconOnly ? 'sq' : 'lead'} ${className}${copied ? ' copied' : ''}`}
       title={title}
+      aria-label={iconOnly ? (copied ? 'Copied' : label) : undefined}
       onClick={() => {
-        navigator.clipboard.writeText(text())
+        navigator.clipboard.writeText(text()).catch(() => { /* denied: the label still confirms the click */ })
         setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => setCopied(false), 2000)
       }}
     >
-      {/* Both labels share one grid cell, so the button is always as wide as the wider of them and
-          the "✓ Copied" swap cannot resize it. It used to shrink on click, which reflowed the
-          wrapped button row on a phone and moved the other buttons out from under your finger. */}
-      <span style={{ display: 'grid', placeItems: 'center' }}>
-        <span style={{ gridArea: '1 / 1', visibility: copied ? 'hidden' : undefined }}>{label}</span>
-        <span style={{ gridArea: '1 / 1', visibility: copied ? undefined : 'hidden' }}>✓ Copied</span>
-      </span>
+      {/* both icons stay mounted and cross-fade; both labels share one grid cell so the swap can
+          never resize the button and reflow a wrapped row under the user's finger */}
+      <span className="swap"><Icon name={icon} /><Icon name="check" /></span>
+      {!iconOnly && (
+        <span className="swap-label">
+          <span aria-hidden={copied}>{label}</span>
+          <span aria-hidden={!copied}>Copied</span>
+        </span>
+      )}
     </button>
   )
 }
 
-// renders both agent-prompt buttons: implement (the implement skill) and review (the code-review skill).
-// Neither carries the project spec — a copied prompt is the task's own sections and nothing else.
-export function CopyPromptButton({ task }: { task: Task }) {
+// Both agent prompts: implement (the implement skill) and review (the code-review skill). Neither
+// carries the project spec — a copied prompt is the task's own sections and nothing else.
+export function CopyPromptButtons({ task }: { task: Task }) {
   return (<>
-    <CopyButton label="🤖 Copy prompt" title="Copy a ready-to-paste prompt for an AI agent to do this task" text={() => taskToPrompt(task)} />
-    <CopyButton label="🔍 Copy review" title="Copy a prompt for an AI agent to code-review this task's implementation" text={() => taskToReviewPrompt(task)} />
+    <CopyButton icon="bot" label="Copy prompt" title="Copy a ready-to-paste prompt for an AI agent to do this task" text={() => taskToPrompt(task)} />
+    <CopyButton icon="review" label="Copy review" title="Copy a prompt for an AI agent to code-review this task's implementation" text={() => taskToReviewPrompt(task)} />
   </>)
 }
 
-export const cardHue = (index: number) => `var(--card-hue-${index % 6})`
-
-const KINDS: [RegExp, string, string][] = [
-  [/fix|bug|broken|repair/, '🔧', 'debugging'],
-  [/test|spec|e2e|matrix/, '🧪', 'software testing'],
-  [/email|mail/, '✉️', 'email spam'],
-  [/auth|permission|security|access|membership|guard/, '🛡️', 'hacker security'],
-  [/client|ui|page|component|style|design|card|color/, '🎨', 'css'],
-  [/migrat|database|index|schema|backfill|term|data/, '🗄️', 'database'],
-  [/deploy|release|ship|rollout|stabiliz/, '🚀', 'deploy friday'],
-  [/document|write.*(spec|doc)|checklist/, '📝', 'paperwork'],
-  [/api|endpoint|route|server|backend/, '🔌', 'backend'],
-  [/metric|track|analytic|measure/, '📊', 'graphs'],
-  [/search|find|filter/, '🔍', 'searching'],
-]
-
-function kindOf(t: Task): [string, string] {
-  const hay = `${t.title} ${t.todo}`.toLowerCase()
-  for (const [re, icon, meme] of KINDS) if (re.test(hay)) return [icon, meme]
-  return ['🧩', 'programming']
+function InlineCode({ text }: { text: string }) {
+  return <>{text.split('`').map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part))}</>
 }
 
-export const taskIcon = (t: Task) => kindOf(t)[0]
-export const taskMemeQuery = (t: Task) => kindOf(t)[1]
+const ITEM = /^(?:\d+[.)]|[-•*])\s+(.*)$/
 
-export const unknownDeps = (t: Task) =>
-  new Set(t.warnings.map(w => (w.match(/unknown dependency "(.*)"/) || [])[1]).filter(Boolean))
-
-// Deliberately dependency-only: a task's `specRefs` are NOT shown here. They are a different
-// relationship ("implements") wearing the same pill as "blocked by", and the Spec tab already
-// carries them — it glows the focused task's entries and dims the rest.
-export function DepChips({ task, resolved }: {
-  task: Task
-  resolved?: (dep: string) => { done: boolean; onClick?: () => void } | null
-}) {
-  const unknown = unknownDeps(task)
-  const deps = task.dependsOn.filter(d => !unknown.has(d.title))
-  if (deps.length === 0 && task.warnings.length === 0) return null
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-        {deps.map(d => {
-          const r = resolved?.(d.title)
-          const style: React.CSSProperties = r?.done
-            ? { color: 'var(--on-lime)', background: 'var(--lime)' }
-            : { color: 'var(--badge-text)', background: 'var(--badge-bg)' }
-          return r?.onClick ? (
-            <button key={d.title} className="pill" title={d.reason} onClick={r.onClick} style={{ ...style, border: 'none', cursor: 'pointer' }}>
-              {r.done ? '✓' : '⛓'} {d.title}
-            </button>
-          ) : r ? (
-            <span key={d.title} className="pill" title={d.reason} style={style}>
-              {r.done ? '✓' : '⛓'} {d.title}
-            </span>
-          ) : (
-            <span key={d.title} className="pill" title={d.reason} style={style}>⛓ {d.title}</span>
-          )
-        })}
-        {task.warnings.map(w => (
-          <span key={w} style={{ fontSize: 12, color: 'var(--warn)' }}>⚠ {w}</span>
-        ))}
-      </div>
-      {deps.filter(d => d.reason).map(d => {
-        const isDone = resolved?.(d.title)?.done ?? false
-        return (
-          <p key={d.title} style={{ fontSize: 12, color: isDone ? 'var(--text-muted)' : 'var(--warn)', margin: '6px 0 0' }}>
-            {isDone ? '✓' : '🔒'} <span style={{ fontWeight: 600 }}>{d.title}:</span> {d.reason}
-          </p>
-        )
-      })}
-    </div>
-  )
-}
-
-export function InlineCode({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('`').map((part, i) =>
-        i % 2 === 1 ? <code key={i} className="inline-code">{part}</code> : part
-      )}
-    </>
-  )
-}
-
-type Tone = 'problem' | 'action' | 'outcome'
-const TONES: Record<Tone, { color: string; bg: string }> = {
-  problem: { color: 'var(--sec-problem)', bg: 'var(--sec-problem-bg)' },
-  action: { color: 'var(--sec-action)', bg: 'var(--sec-action-bg)' },
-  outcome: { color: 'var(--sec-outcome)', bg: 'var(--sec-outcome-bg)' },
-}
-
-export function Section({ name, text, tone, large = false }: { name: string; text: string; tone: Tone; large?: boolean }) {
-  const c = TONES[tone]
-  // pixel chrome, crisp content: the dense task prose uses a readable humanist sans
-  // (the pixel faces carry the titles/HUD/labels; this is only the reading text)
-  const body = {
-    fontFamily: '-apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    fontSize: large ? 15 : 13.5,
-    lineHeight: 1.65,
+// Runs of list lines (numbered or bulleted) render as one numbered list; anything else is a paragraph.
+function Lines({ lines }: { lines: string[] }) {
+  const blocks: (string | string[])[] = []
+  for (const line of lines) {
+    const item = line.match(ITEM)?.[1]
+    if (item === undefined) blocks.push(line)
+    else if (Array.isArray(blocks.at(-1))) (blocks.at(-1) as string[]).push(item)
+    else blocks.push([item])
   }
-  return (
-    <div style={{ background: c.bg, borderLeft: `3px solid ${c.color}`, borderRadius: '0 8px 8px 0', padding: '10px 14px', margin: `0 0 ${large ? 14 : 8}px` }}>
-      <p style={{ fontSize: large ? 12 : 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: c.color, margin: '0 0 4px' }}>
-        {name}
-      </p>
-      {text.split('\n').map((line, i) => {
-        const kw = line.match(/^(Scenario|Before|After):\s*(.*)$/)
-        if (kw) return (
-          <p key={i} style={{ ...body, margin: '8px 0 0' }}>
-            <span style={{ fontWeight: 600, color: c.color }}>{kw[1]}:</span> <InlineCode text={kw[2]} />
-          </p>
-        )
-        const step = line.match(/^(\d+)[.)]\s+(.*)$/)
-        if (step) return (
-          <p key={i} style={{ ...body, margin: '8px 0 0', display: 'flex', gap: 8 }}>
-            <span style={{
-              flexShrink: 0, width: 20, height: 20, marginTop: 2, borderRadius: 999,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700, color: c.color,
-              background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
-            }}>
-              {step[1]}
-            </span>
-            <span style={{ minWidth: 0 }}><InlineCode text={step[2]} /></span>
-          </p>
-        )
-        const bullet = line.match(/^[-•*]\s+(.*)$/)
-        if (bullet) return (
-          <p key={i} style={{ ...body, margin: '4px 0 0', paddingLeft: 28, textIndent: -12 }}>
-            <span style={{ color: c.color, fontWeight: 700 }}>•</span> <InlineCode text={bullet[1]} />
-          </p>
-        )
-        return (
-          <p key={i} style={{ ...body, margin: i === 0 ? 0 : '6px 0 0' }}>
-            <InlineCode text={line} />
-          </p>
-        )
-      })}
-    </div>
-  )
+  return <>{blocks.map((b, i) => Array.isArray(b)
+    ? <ol key={i} className="steps">{b.map((s, j) => <li key={j}><span><InlineCode text={s} /></span></li>)}</ol>
+    : <p key={i}><InlineCode text={b} /></p>)}</>
 }
 
-// The Focus deck re-renders on every pointermove while a card is being dragged, and each
-// Section re-splits its text and runs three regexes per line. Memoising on the task keeps that
-// work from repeating 60+ times a second for cards whose prose has not changed.
-export const TaskSections = memo(function TaskSections({ task, large = false }: { task: Task; large?: boolean }) {
-  return (<>
-    <Section name="Problem" text={task.problem} tone="problem" large={large} />
-    <Section name="What to do" text={task.todo} tone="action" large={large} />
-    <Section name="Expected outcome" text={task.outcome} tone="outcome" large={large} />
-  </>)
+const split = (text: string, keys: string[]) => {
+  const found: Record<string, string> = {}
+  const rest = text.split('\n').filter(l => l.trim()).filter(l => {
+    const m = l.match(/^(\w+):\s*(.*)$/)
+    if (m && keys.includes(m[1])) { found[m[1]] = m[2]; return false }
+    return true
+  })
+  return { rest, found }
+}
+
+const Empty = () => <p className="faint">Not written yet</p>
+
+// The Focus deck re-renders on every pointermove while a card is dragged; memoising on the task
+// keeps the per-line parsing from repeating 60+ times a second for prose that has not changed.
+export const TaskSections = memo(function TaskSections({ task }: { task: Task }) {
+  const problem = split(task.problem, ['Scenario'])
+  const outcome = split(task.outcome, ['Before', 'After'])
+  const { Before, After } = outcome.found
+  return (
+    <div className="secs">
+      <section className="sec">
+        <h4>Problem</h4>
+        {problem.rest.length ? <Lines lines={problem.rest} /> : <Empty />}
+        {problem.found.Scenario && <div className="scenario"><b>Scenario</b> · <InlineCode text={problem.found.Scenario} /></div>}
+      </section>
+      <section className="sec">
+        <h4>What to do</h4>
+        {task.todo.trim() ? <Lines lines={task.todo.split('\n').filter(l => l.trim())} /> : <Empty />}
+      </section>
+      <section className="sec">
+        <h4>Expected outcome</h4>
+        {outcome.rest.length ? <Lines lines={outcome.rest} /> : !(Before || After) && <Empty />}
+        {(Before || After) && (
+          <div className="compare">
+            <div className="b"><b>Before</b><InlineCode text={Before ?? '—'} /></div>
+            <div className="a"><b>After</b><InlineCode text={After ?? '—'} /></div>
+          </div>
+        )}
+      </section>
+    </div>
+  )
 })
 
-export function TaskCard({ task, index, checked, onToggle, resolveDep, onSelect, collapsed, onToggleExpand }: {
+/** Dependencies, the spec entries the task implements, parser warnings, and its three sections. */
+export function TaskBody({ task, tasks, done, refs = [], specIds, onJump, onSpecRef }: {
+  task: Task
+  tasks: Task[]
+  done: Set<number>
+  /** the task's `specRefs` */
+  refs?: string[]
+  /** every entry id in the project spec; null when the project has no spec */
+  specIds: Set<string> | null
+  onJump: (index: number) => void
+  onSpecRef: (id: string) => void
+}) {
+  return (<>
+    {(task.dependsOn.length > 0 || refs.length > 0) && (
+      <div className="refs">
+        {task.dependsOn.length > 0 && (
+          <div className="ref-row">
+            <span className="k">Depends on</span>
+            <div className="v deps">
+              {task.dependsOn.map(d => {
+                const j = resolveDepIndex(tasks, d.title)
+                const ok = j > -1 && done.has(j)
+                return (
+                  <div className="dep" key={d.title}>
+                    {j > -1
+                      ? <button className={`chip${ok ? ' ok' : ''}`} onClick={() => onJump(j)} title={ok ? 'Approved — go to it' : 'Go to this task'}>
+                          <Icon name={ok ? 'check' : 'chev-r'} />{pad(j)} · {d.title}
+                        </button>
+                      : <span className="chip warn" title="No task in this plan has this title"><Icon name="alert" />{d.title}</span>}
+                    {d.reason && <span className="why">{d.reason}</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {refs.length > 0 && (
+          <div className="ref-row">
+            <span className="k">Implements</span>
+            <div className="v">
+              {refs.map(r => specIds?.has(r)
+                ? <button key={r} className="chip code accent" onClick={() => onSpecRef(r)} title="Show in the Spec tab"><Icon name="code" />{r}</button>
+                // the API accepts unknown refs on purpose, so the card is where a typo surfaces
+                : <span key={r} className="chip code warn" title={`No spec entry named “${r}”`}><Icon name="alert" />{r}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+    {task.errors.length > 0 && (
+      <div className="callout warn" role="note">
+        <Icon name="alert" />
+        <span>{task.errors.join(', ')}. Incomplete tasks are not saved with the project until they are filled in.</span>
+      </div>
+    )}
+    {task.warnings.filter(w => !/unknown dependency/.test(w)).map(w => (
+      <div className="callout warn" key={w}><Icon name="alert" /><span>{w}</span></div>
+    ))}
+    <TaskSections task={task} />
+  </>)
+}
+
+/** One List-view row: a checkbox, the title (expands the detail and points the side pane at it). */
+export function TaskRow({ task, index, checked, selected, expanded, flash = false, onToggle, onOpen, children }: {
   task: Task
   index: number
-  checked?: boolean
-  onToggle?: () => void
-  resolveDep?: (title: string) => { done: boolean } | null
-  onSelect?: () => void
-  collapsed: boolean
-  onToggleExpand: () => void
+  checked: boolean
+  selected: boolean
+  expanded: boolean
+  /** just changed through the API */
+  flash?: boolean
+  onToggle: () => void
+  onOpen: () => void
+  children: ReactNode
 }) {
-  const hue = cardHue(index)
-  // one click both reveals the detail and points the diagram at this task
-  const onTitleClick = () => { onToggleExpand(); onSelect?.() }
-  const titleHint = collapsed ? 'Show detail and highlight in the diagram' : 'Hide detail'
-  // While collapsed the whole card is the hit target. Once open, only the header row closes
-  // it again — the body has to stay selectable, since copying a file path out of "What to do"
-  // is the main thing people do there, and a click-to-collapse body would fight that.
-  const onCardClick = (e: React.MouseEvent) => {
-    const el = e.target as HTMLElement
-    if (el.closest('button, a')) return // the card holds no other controls; these keep their clicks
-    if (!collapsed && !el.closest('[data-task-header]')) return
-    onTitleClick()
-  }
-  // the error line stands in for the sections, so it stays visible while collapsed: errors mean
-  // this task gets SKIPPED at ship time, which a list you are scanning must not hide. Dependency
-  // warnings (in DepChips) do stay hidden until expanded — they block nothing, so they can wait.
-  const hasError = task.errors.length > 0
-  const errorLine = (
-    <p style={{ fontSize: 13, color: 'var(--warn)', margin: 0 }}>
-      ⚠ {task.errors.join(', ')} — this task will be skipped.
-    </p>
-  )
-  // Rendered TWICE — beside the title and again in the card's footer — with CSS showing exactly one
-  // per width (see .approve-head / .task-foot). A single node can't be in the header row on a wide
-  // screen and at the card's bottom on a phone: they are different parents, which no CSS moves it
-  // between. The hidden copy is display:none, so it is out of the a11y tree too.
-  const approveButton = (where: string) => onToggle && !hasError && (
-    <button
-      className={`btn-done ${where}${checked ? ' checked' : ''}`}
-      style={{ height: 28, fontSize: 12, padding: '0 12px', whiteSpace: 'nowrap' }}
-      onClick={onToggle}
-    >
-      {checked ? '✓ Approved' : 'Approve'}
-    </button>
-  )
   return (
-    <div
-      className="card"
-      data-clickable={collapsed ? '' : undefined}
-      onClick={onCardClick}
-      style={{
-        borderColor: hasError ? 'var(--warn-border)' : 'var(--border)',
-        borderTop: `3px solid ${hue}`,
-        opacity: checked ? 0.8 : undefined,
-      }}
-    >
-      {/* layout in theme.css: the row has to sit on one line on a wide screen but stack on a phone,
-          which no single set of flex values does — see .task-head */}
-      <div
-        data-task-header=""
-        className="task-head"
-        style={{ marginBottom: collapsed && !hasError ? 0 : 10 }}
-      >
-        {/* the accessible control stays on the title (a role=button wrapping the Approve
-            button would be invalid nesting); the card click above is a mouse convenience */}
-        <span
-          className="task-head-title"
-          title={titleHint}
-          role="button"
-          tabIndex={0}
-          aria-expanded={!collapsed}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTitleClick() }
-          }}
-        >
-          <span className="caret" aria-hidden="true" style={{ transform: collapsed ? 'none' : 'rotate(90deg)' }}>▸</span>
-          <span className="icon-chip" style={{ background: `color-mix(in srgb, ${hue} 14%, transparent)` }}>{taskIcon(task)}</span>
-          <span className="serif" style={{ fontSize: 17, fontWeight: 600 }}>{task.title}</span>
-        </span>
-        <span className="task-head-actions">
-          {!collapsed && <CopyPromptButton task={task} />}
-          {approveButton('approve-head')}
-          <span className="pill" style={{ color: hue, background: `color-mix(in srgb, ${hue} 14%, transparent)`, whiteSpace: 'nowrap' }}>
-            Task {index + 1}
+    <div className={`trow${selected ? ' sel' : ''}${flash ? ' flash' : ''}`} data-task={index} data-done={checked}>
+      <div className="row-line">
+        <button className="check" role="checkbox" aria-checked={checked} onClick={onToggle} aria-label={`Approve ${task.title}`}>
+          <Icon name="check" />
+        </button>
+        <button className="row-main" aria-expanded={expanded} onClick={onOpen}>
+          <span className="n">{pad(index)}</span>
+          <span className="t">{task.title}</span>
+          <span className="meta hide-mobile">
+            {task.errors.length > 0 && <span className="chip warn"><Icon name="alert" />incomplete</span>}
+            {task.dependsOn.length > 0 && <span className="chip" title="Dependencies"><Icon name="flow" />{task.dependsOn.length}</span>}
           </span>
-        </span>
+          <Icon name="chev-d" className="chev" />
+        </button>
       </div>
-      {/* errors stay outside the collapsing wrapper — they read in both states, because a task
-          that will be SKIPPED at ship time must announce itself in a list you are scanning */}
-      {hasError && errorLine}
-      {/* Always mounted, and closed via an attribute rather than by unmounting: a transition needs
-          both ends to exist, so conditional rendering is exactly what made collapsing un-animatable.
-          Its single child is what the row height resolves to. */}
-      <div className="task-detail" data-closed={collapsed || undefined}>
-        <div>
-          <DepChips task={task} resolved={resolveDep} />
-          {!hasError && <TaskSections task={task} />}
+      {expanded && (
+        <div className="row-detail">
+          <div className="tools"><CopyPromptButtons task={task} /></div>
+          {children}
         </div>
-      </div>
-      <div className="task-foot">{approveButton('approve-foot')}</div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,8 @@
-# plan-to-linear 🃏
+# Yak Dai 🃏
 
-Paste a markdown plan → review it task-by-task like a card deck → ship the approved tasks to Linear as linked issues.
+Repo and database name: `plan-to-linear` (kept for existing data).
+
+Paste a markdown plan → review it task-by-task like a card deck → hand each approved task to an AI agent with one copied prompt.
 
 Built for a workflow where plans are written (often by an AI) faster than they can be reviewed: every task becomes a swipeable card, the plan arrives with its own architecture diagram and spec, review progress persists in MongoDB, and an AI agent can edit tasks through the API while you watch the cards update live.
 
@@ -8,7 +10,7 @@ Built for a workflow where plans are written (often by an AI) faster than they c
 
 1. **Get a plan in.** Either run a planning skill in Claude Code — it writes the plan, creates the project, and hands back the review link — or paste markdown yourself in the app's format (*Copy AI format prompt* makes any AI reshape a free-form plan for you).
 2. **Review** — swipe through the Focus deck (✓ approve / ✗ skip) or work the List view, where tasks are grouped into independent tracks so you can see what two people could pick up in parallel. Beside the cards sit the plan's flowchart, sequence diagram and spec; selecting a task lights up the parts it touches.
-3. **Ship** — send the approved tasks to Linear as issues; `Depends on` lines become real *blocks* relations. Skipped tasks stay behind in the app, and so does the spec.
+3. **Hand off** — copy a ready-to-run prompt for any task, or a code-review prompt to check the work once it lands. Neither carries the spec; it stays in the app.
 
 ## Quick start
 
@@ -20,7 +22,6 @@ docker compose up --build
 
 - App: http://localhost:5173
 - MongoDB (for Robo 3T etc.): `mongodb://localhost:27019/plan-to-linear`
-- Optional: export `LINEAR_API_KEY` / `GIPHY_API_KEY` in your shell first to enable shipping and card memes.
 
 The web container serves a **built** bundle, so code changes need `--build` to show up. For iterating, use local dev instead.
 
@@ -32,7 +33,7 @@ npm install
 npm run dev            # vite on 5173 + API on 3001
 ```
 
-Without `MONGODB_URI` the app still works for a single session (paste → review → ship); saving, the projects page, and reopening are disabled gracefully.
+Without `MONGODB_URI` the app still works for a single session (paste → review); saving, the project list, and reopening are disabled gracefully.
 
 ### Where things live in the browser
 
@@ -40,7 +41,7 @@ Without `MONGODB_URI` the app still works for a single session (paste → review
 |---|---|
 | `/` | Homepage |
 | `/?page=new` | Paste a plan |
-| `/?page=projects` | Saved projects |
+| `/?page=projects` | Paste a plan, with the project list open (it is in the sidebar on every app screen) |
 | `/?project=<id>` | That project, straight into review |
 
 ### Environment variables
@@ -48,8 +49,6 @@ Without `MONGODB_URI` the app still works for a single session (paste → review
 | Variable | Required | Purpose |
 |---|---|---|
 | `MONGODB_URI` | for persistence | e.g. `mongodb://localhost:27019/plan-to-linear` |
-| `LINEAR_API_KEY` | for shipping | Linear personal API key |
-| `GIPHY_API_KEY` | no | memes on the Focus deck cards |
 | `PORT` | no | API port (default 3001) |
 | `API_ORIGIN` | no | where Vite proxies `/api` (default `http://localhost:3001`) |
 
@@ -84,10 +83,10 @@ The markdown format holds only the tasks. Three further artifacts ride along on 
 | Field | What it is |
 |---|---|
 | `diagram` | Mermaid architecture flowchart of the components the plan touches |
-| `sequenceDiagram` | Mermaid sequence diagram of the runtime flow through those same components |
+| `sequenceDiagram` | Mermaid sequence diagram of the runtime flow through those same components. A message that implements a spec entry ends its label with that spec entry id in brackets — `web->>apiServer: create project [postProjects]` — and the tag is stripped before rendering |
 | `spec` | Structured spec, `{ section: [{ id, ...anything }] }` — data models, API contracts, interfaces |
 
-Each task can name the `diagramNodes` and `specRefs` it touches. Select a task and the review screen glows those flowchart nodes and spec entries and dims the rest, so you can see the blast radius while you read the card. Sequence participant ids reuse the flowchart's node ids for the same reason.
+Each task can name the `diagramNodes` and `specRefs` it touches. Select a task and the review screen glows those flowchart nodes and spec entries and dims the rest, so you can see the blast radius while you read the card. Sequence participant ids reuse the flowchart's node ids for the same reason. Hovering a tagged arrow in the sequence view shows its spec entry (id, name and every field) without leaving the diagram; a tag naming no spec entry id shows a warning instead.
 
 **The app never generates any of this** — it only renders it. A `PUT /projects/:id` with just `diagram`, `sequenceDiagram` or `spec` fixes one up without disturbing tasks or their live approval state.
 
@@ -102,7 +101,7 @@ curl -X PATCH localhost:3001/api/v1/projects/$PID/tasks/$TID \
   -d '{"todo":"New concrete steps."}'
 ```
 
-Full endpoint reference lives in [CLAUDE.md](CLAUDE.md) (which doubles as the API doc for AI sessions). Also under `/api/v1`: `GET /teams` and `POST /issues` (Linear), `GET /memes?q=`.
+Full endpoint reference lives in [CLAUDE.md](CLAUDE.md) (which doubles as the API doc for AI sessions).
 
 ## Working with Claude
 
@@ -117,12 +116,15 @@ Full endpoint reference lives in [CLAUDE.md](CLAUDE.md) (which doubles as the AP
 ```
 src/                      # React + Vite
 ├── App.tsx               # state container + lazy page switch (no router lib; URL mirrors state)
-├── pages/                # Home, Input, Projects, Review, Ship — one lazy chunk each
+├── theme.css             # tokens (two-tier: primitives → --color-* roles) + all styles
+├── pages/                # Home, Input, Review — one lazy chunk each
 ├── components/
-│   ├── TaskCard.tsx      # a task in the List view
+│   ├── Sidebar.tsx       # project list, pagination, delete dialog
+│   ├── TaskCard.tsx      # task body, List-view row, copy-prompt buttons
 │   ├── CardViewer.tsx    # the Focus deck (drag, throw, undo)
 │   ├── DiagramPanel.tsx  # mermaid render + zoom/pan + per-task highlight
 │   ├── SpecPanel.tsx     # the Spec tab, rendered or raw JSON
+│   ├── Icon.tsx          # inline currentColor stroke icons
 │   └── ThemeToggle.tsx
 └── lib/api.ts            # ALL server calls (typed fetch wrappers)
 
@@ -137,8 +139,6 @@ server/                   # Express + TypeScript (tsx)
 shared/
 ├── parse.ts              # plan markdown parser ⇄ serializer (used by both sides)
 └── groups.ts             # groupTasks — splits tasks into independent tracks
-
-public/home/              # product screenshots used by the homepage
 ```
 
 Two MongoDB collections: `projects` and `tasks` (`projectId` FK, `order`, cascade delete).

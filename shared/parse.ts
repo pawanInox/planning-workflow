@@ -29,7 +29,7 @@ const DEP_SEPARATOR_LEADING = /^(?:\s+—\s+|\s+--\s+)/
 /**
  * A dependency line is `<task title> — <reason>`, but a TITLE may itself contain the separator,
  * and splitting on the first one then silently renames the dependency so it resolves to no task —
- * dropping the blocking edge from both the review tree and Linear.
+ * dropping the blocking edge from the review tree and the copied prompts.
  *
  * So match the longest real task title the line starts with, and treat only what follows as the
  * reason. Falls back to the naive split when the line names no task in this plan (the parser
@@ -158,15 +158,10 @@ const depLines = (t: Task) =>
 const sections = (t: Task) =>
   `## Problem\n${t.problem}\n\n## What to do\n${t.todo}\n\n## Expected outcome\n${t.outcome}`
 
-// The project spec stays IN the app: none of the three renderings below carry a `## Spec` block.
-// A task's four sections are the whole contract wherever it travels — a Linear issue, an agent
-// prompt, a review prompt. `specRefs` still drive the review screen (glow, dim, card chips); they
+// The project spec stays IN the app: neither rendering below carries a `## Spec` block.
+// A task's four sections are the whole contract wherever it travels — an agent prompt or a
+// review prompt. `specRefs` still drive the review screen (glow, dim, card chips); they
 // just don't follow the task out of the app. Don't reintroduce a spec block in any of these.
-
-export function taskToDescription(t: Task): string {
-  const deps = t.dependsOn.length ? `\n\n## Blocked by\n${depLines(t)}` : ''
-  return `> 🤖 **For AI agents:** ${AGENT_RULES}\n\n${sections(t)}${deps}`
-}
 
 export function taskToPrompt(t: Task): string {
   const deps = t.dependsOn.length

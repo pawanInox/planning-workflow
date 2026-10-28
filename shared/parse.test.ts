@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parsePlan, planToMarkdown, taskToDescription, taskToPrompt, taskToReviewPrompt } from './parse.ts'
+import { parsePlan, planToMarkdown, taskToPrompt, taskToReviewPrompt } from './parse.ts'
 
 const plan = `# Plan: onboarding revamp
 
@@ -35,7 +35,7 @@ test('parses tasks and sections', () => {
   assert.equal(b.title, 'broken task')
   assert.deepEqual(b.errors, ['missing "### What to do"', 'missing "### Expected outcome"'])
 
-  assert.match(taskToDescription(a), /## Problem\nNo email after signup\./)
+  assert.match(taskToPrompt(a), /## Problem\nNo email after signup\./)
 })
 
 test('empty input yields no tasks', () => {
@@ -152,7 +152,7 @@ const specTask = parsePlan(depPlan).tasks[0]
 // The project spec stays in the app: nothing a task renders into carries it, and none of these
 // take a spec argument to pass one through. This is the guard against quietly re-adding it.
 test('no rendering of a task carries a Spec block', () => {
-  for (const render of [taskToDescription, taskToPrompt, taskToReviewPrompt]) {
+  for (const render of [taskToPrompt, taskToReviewPrompt]) {
     assert.ok(!render(specTask).includes('## Spec'))
     assert.equal(render.length, 1) // the task, and nothing else
   }

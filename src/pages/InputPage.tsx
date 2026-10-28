@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import type { Task } from '../../shared/parse'
-import { cardHue, taskIcon } from '../components/TaskCard'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { CopyButton } from '../components/TaskCard'
+import { pad } from '../lib/ui'
+import { Icon } from '../components/Icon'
 
 const FORMAT_PROMPT = `Reformat the plan below into EXACTLY this markdown structure (a parser reads it, so headings must match verbatim):
 
@@ -29,98 +29,84 @@ Here is the plan to reformat:
 
 `
 
-export function InputPage({ md, tasks, hasProjects, onMdChange, onShowProjects, onStartReview, onHome }: {
+export function InputPage({ md, tasks, onMdChange, onStartReview, onBackToReview, onMenu }: {
   md: string
   tasks: Task[]
-  hasProjects: boolean
   onMdChange: (value: string) => void
-  onShowProjects: () => void
   onStartReview: () => void
-  onHome: () => void
+  /** set while the markdown still matches a saved project, so review can resume without re-saving */
+  onBackToReview?: () => void
+  onMenu: () => void
 }) {
-  const [copied, setCopied] = useState(false)
-
-  function copyFormatPrompt() {
-    navigator.clipboard.writeText(FORMAT_PROMPT + md)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
+  const bad = tasks.filter(t => t.errors.length).length
+  const mismatch = md.trim() !== '' && tasks.length === 0
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100vh' }}>
-      <span className="blob" style={{ width: 340, height: 340, top: -90, right: -70, background: 'var(--accent)' }} />
-      <span className="blob" style={{ width: 260, height: 260, bottom: -60, left: -80, background: 'var(--card-hue-1)' }} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 16 }}>
-        <button className="btn-ghost" style={{ marginRight: 'auto' }} onClick={onHome}>← Home</button>
-        {hasProjects && (
-          <button className="btn-ghost" onClick={onShowProjects}>📁 Projects</button>
-        )}
-        <ThemeToggle />
-      </div>
-      <header style={{ padding: '8px 0 0', textAlign: 'center' }}>
-        <span className="eyebrow" style={{ display: 'block', marginBottom: 14 }}>◆ quest log ◆</span>
-        <h1 className="serif" style={{ fontSize: 44, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
-          Yak Dai&nbsp;<span style={{ color: 'var(--accent)' }}>Tham Eng</span>
-        </h1>
-        <div className="eyebrow" style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', margin: '16px 0 0', fontSize: 11 }}>
-          <span><span style={{ color: 'var(--accent)' }}>01</span> paste a plan</span>
-          <span style={{ opacity: 0.4 }}>▸</span>
-          <span><span style={{ color: 'var(--accent)' }}>02</span> review card by card</span>
-          <span style={{ opacity: 0.4 }}>▸</span>
-          <span><span style={{ color: 'var(--accent)' }}>03</span> ship to Linear</span>
-        </div>
+    <main className="main">
+      <header className="head">
+        <button className="btn btn-ghost sq only-mobile" onClick={onMenu} aria-label="Open projects"><Icon name="menu" /></button>
+        <h1>New plan</h1>
+        <span className="grow" />
+        {onBackToReview && <button className="btn btn-ghost lead" onClick={onBackToReview}><Icon name="chev-l" />Back to review</button>}
       </header>
-
-      <textarea
-        value={md}
-        onChange={e => onMdChange(e.target.value)}
-        placeholder={'# Plan: title\n\n## Task: task title\n### Problem\n### What to do\n### Expected outcome'}
-        className="card"
-        style={{ flex: 1, minHeight: 320, width: '100%', fontFamily: 'ui-monospace, monospace', fontSize: 12.5, lineHeight: 1.7, resize: 'none' }}
-      />
-
-      {tasks.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {tasks.map((t, i) => (
-            <span
-              key={i}
-              className="icon-chip"
-              title={t.title}
-              style={{
-                background: `color-mix(in srgb, ${cardHue(i)} 16%, transparent)`,
-                transform: `rotate(${(i % 5 - 2) * 4}deg)`,
-                opacity: t.errors.length ? 0.35 : 1,
-              }}
-            >
-              {taskIcon(t)}
-            </span>
-          ))}
+      <div className="body">
+        <div className="paste">
+          <div className="paste-ed">
+            <div className="paste-bar">
+              <span className="eyebrow">Markdown</span>
+              <span className="grow" />
+              <button className="btn btn-ghost sm" disabled={!md} onClick={() => onMdChange('')}>Clear</button>
+            </div>
+            <label htmlFor="md" className="sr">Plan markdown</label>
+            <textarea
+              id="md"
+              autoFocus
+              spellCheck={false}
+              value={md}
+              onChange={e => onMdChange(e.target.value)}
+              placeholder={'# Plan: title\n\n## Task: task title\n### Problem\n### What to do\n### Expected outcome\n### Depends on (optional)'}
+            />
+          </div>
+          <div className="paste-pv">
+            <div className="paste-bar"><span className="eyebrow">Preview</span></div>
+            {mismatch ? (
+              <div className="mismatch-wrap">
+                <div className="surface mismatch" role="note">
+                  <h3><Icon name="alert" />This plan isn't in the app's format</h3>
+                  <p>Copy the prompt below. It already includes your plan. Paste it into any AI and paste the result back here.</p>
+                  <div><CopyButton icon="copy" label="Copy AI format prompt + my plan" className="" title="Copy a reformatting prompt with your plan appended" text={() => FORMAT_PROMPT + md} /></div>
+                </div>
+              </div>
+            ) : tasks.length > 0 ? (
+              <div className="pv-list">
+                {tasks.map((t, i) => (
+                  <div key={i} className={`surface pv-item${t.errors.length ? ' bad' : ''}`}>
+                    <span className="n">{pad(i)}</span>
+                    <span className="t">{t.title}</span>
+                    {t.errors.length > 0
+                      ? <span className="chip warn" title={t.errors.join(', ')}><Icon name="alert" />incomplete</span>
+                      : t.dependsOn.length > 0 && <span className="chip" title="Dependencies"><Icon name="flow" />{t.dependsOn.length}</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="pv-empty">
+                <span className="ico"><Icon name="paste" /></span>
+                <b>Paste a plan to see its tasks</b>
+                <span>Each <code>## Task:</code> becomes one card.</span>
+              </div>
+            )}
+            <div className="pv-foot">
+              {tasks.length > 0 && (
+                <span className="chip num">{tasks.length} task{tasks.length === 1 ? '' : 's'}{bad > 0 && ` · ${bad} incomplete`}</span>
+              )}
+              <span className="grow" />
+              <button className="btn btn-primary trail" disabled={tasks.length === 0} onClick={onStartReview}>
+                Start review<Icon name="send" />
+              </button>
+            </div>
+          </div>
         </div>
-      )}
-
-      {md.trim() !== '' && tasks.length === 0 && (
-        <div className="card" style={{ borderColor: 'var(--warn-border)', textAlign: 'center' }}>
-          <p style={{ fontSize: 14, margin: '0 0 4px', fontWeight: 600 }}>🤖 This plan doesn't match the app's format</p>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-            No problem — copy the prompt below (it already includes your plan), paste it into any AI, and paste the result back here.
-          </p>
-          <button className="btn-primary" onClick={copyFormatPrompt}>
-            {copied ? '✓ Copied — paste it into your AI' : 'Copy AI format prompt + my plan'}
-          </button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 8 }}>
-        {tasks.length > 0 && (
-          <span className="pill" style={{ color: 'var(--badge-text)', background: 'var(--badge-bg)' }}>
-            {tasks.length} task{tasks.length === 1 ? '' : 's'}
-            {tasks.some(t => t.errors.length) ? ` · ${tasks.filter(t => t.errors.length).length} incomplete` : ''}
-          </span>
-        )}
-        <button className="btn-primary" disabled={tasks.length === 0} onClick={onStartReview}>
-          Start review →
-        </button>
       </div>
-    </div>
+    </main>
   )
 }

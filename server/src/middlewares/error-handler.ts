@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { ZodError } from 'zod'
-import { NotFoundError, ServiceUnavailableError, UpstreamError } from '../services/errors.ts'
+import { NotFoundError, ServiceUnavailableError } from '../services/errors.ts'
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
@@ -12,7 +12,6 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
   if (err instanceof NotFoundError) return res.status(404).json({ status: 'error', message: err.message })
   if (err instanceof ServiceUnavailableError) return res.status(503).json({ status: 'error', message: err.message })
-  if (err instanceof UpstreamError) return res.status(502).json({ status: 'error', message: err.message })
   // express.json() and friends attach their own client-error status (400 on malformed JSON,
   // 413 on an oversized body). Reporting those as 500 tells the client to retry a request
   // that can never succeed, and breaks the documented error contract.

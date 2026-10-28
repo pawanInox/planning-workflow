@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "better-colors": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-colors/SKILL.md",
+      "computedHash": "b24b63ebd25658a95e5f791cd83552aca6554dd6746aa6065d930a9492fb9886"
+    },
     "brandkit": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",

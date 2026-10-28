@@ -1,6 +1,6 @@
 ---
 name: yak-dai
-description: Turn a goal — or a whole conversation — into a spec plus an implementation plan in the strict format the plan-to-linear app can split into Linear tasks. Runs the grilling → to-spec → to-tickets pipeline (no docs written), generates a mermaid architecture diagram and a structured spec JSON from the spec, then renders the tickets into the app's plan format and auto-creates the project (diagrams and spec included, tasks tagged with the diagram nodes and spec entries they touch). Use when the user invokes /yak-dai, asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grilling session into tasks.
+description: Turn a goal — or a whole conversation — into a spec plus an implementation plan in the strict format the plan-to-linear app can split into reviewable tasks. Runs the grilling → to-spec → to-tickets pipeline (no docs written), generates a mermaid architecture diagram and a structured spec JSON from the spec, then renders the tickets into the app's plan format and auto-creates the project (diagrams and spec included, tasks tagged with the diagram nodes and spec entries they touch). Use when the user invokes /yak-dai, asks to "write a plan for linear", "make a linear plan", "plan me a feature", gives a goal to break into tasks, wants pickup-ready tasks, or wants to convert a discussion/grilling session into tasks.
 ---
 
 # Yak-dai (grill → spec → tickets → plan)
@@ -50,15 +50,16 @@ This skill chains four skills that live in `~/.agents/skills/` (Claude Code does
          reviewPage["Review screen"] --> taskCard["Task card"]
          reviewPage --> specPanel["Spec tab"]
        end
-       subgraph "3 · Ship — approved tasks only"
+       subgraph "3 · Hand off — approved tasks only"
          direction LR
-         shipPage["Ship screen"] --> linear["Linear"]
+         copyPrompt["Copy prompt"] --> agent["AI agent"]
        end
 
        mongo -->|"3s poll"| reviewPage
-       taskCard -->|"approved"| shipPage
+       taskCard -->|"approved"| copyPrompt
      ```
    - **Sequence diagram** (`sequenceDiagram`): the main runtime flow(s) through those same components. Declare every participant as `participant <sameCamelCaseId> as <display label>` — participant ids MUST reuse the flowchart's node ids verbatim, because the app highlights both diagrams by those ids (flowchart nodes glow; sequence messages between the task's participants light up while the rest dims).
+     - **Tag contract-bearing messages with their spec entry id.** A message that implements a spec `api` entry ends its label with that entry's id in square brackets: `web->>apiServer: create project [postProjects]`. The app strips the tag before rendering and shows that spec entry when the reviewer hovers the arrow. The id must match a spec entry id exactly — an unknown id shows a visible warning on hover — and internal calls with no contract stay untagged. The tag must be the last thing on the line, and only one tag per message is read (an earlier `[...]` stays ordinary label text), matching how the app's `parseSeqTags` reads it. mermaid parses the tagged label as-is, so validation still works on the raw source.
    - Validate BOTH diagram sources before use (mermaid-skill's validation-first rule — Kroki or local `mmdc`; no PNG export needed).
    - **Spec JSON**: the structured extract of the spec's **Implementation Decisions** — schema changes, API contracts, module interfaces. It is a **review-time artifact only**: it never leaves the app, so it is never a substitute for a task's own `### What to do`. A task that reads as "implement the spec entries" is a broken task — spell the work out in the task, and let the spec be the map the reviewer reads alongside it. Shape is `Record<section, Entry[]>`:
      - Sections are **open**: `dataModels`, `api` and `interfaces` are the typical ones, not a closed list. Add a section when the decisions call for one; leave one out when they don't.
@@ -134,6 +135,6 @@ Repeat the `## Task:` block for every task. Prose outside task blocks is ignored
 - **Expected outcome** must be checkable, and always ends with `Before:` and `After:` lines replaying the Problem's scenario — the same action, showing today's result vs the result once done. Not "it works better".
 - 3–10 tasks per plan. Bigger than 10 → the plan is too big, split the plan itself.
 - Task titles are imperative and unique ("add welcome email", not "email stuff").
-- Order tasks by execution order — order is the default dependency. Add `### Depends on` only for hard prerequisites, listing exact task titles from this plan (the app links them as "blocked by" in Linear); never reference a task outside this plan.
+- Order tasks by execution order — order is the default dependency. Add `### Depends on` only for hard prerequisites, listing exact task titles from this plan (the app shows them as dependency chips and groups linked tasks into one track); never reference a task outside this plan.
 - A dependency added for tidiness, or to avoid rework, is NOT a blocker — and it is not free. The review screen groups tasks into independent tracks by these edges (connected components of the dependency graph), so one soft edge merges two tracks into one and hides work two people could have picked up in parallel. If a task could technically start before another finishes, leave the edge out and let plan order carry the sequence.
 - Every dependency line must carry a blocking reason after ` — `: state what concretely fails in this task without it ("without the `username` column, `/u/:username` has nothing to resolve and every route 404s"), never a vague "needs it first". The app shows this reason on the card so a picker knows why they must wait.

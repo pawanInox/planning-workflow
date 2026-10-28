@@ -14,12 +14,9 @@ export type SpecEntry = { id: string } & Record<string, unknown>
 export type Spec = Record<string, SpecEntry[]>
 export type ProjectWithTasks = { id: string; title: string; diagram?: string; sequenceDiagram?: string; spec?: Spec; tasks: SavedTask[] }
 export type TaskPayload = Omit<SavedTask, 'id'>
-export type Team = { id: string; name: string; key: string }
-export type CreatedIssue = { title: string; url: string }
-export type Meme = { url: string; pageUrl: string; title: string }
 
 const BASE = '/api/v1'
-export const PROJECTS_PER_PAGE = 10
+const PROJECTS_PER_PAGE = 10
 
 // server responses use the envelope { status: 'ok'|'error', message, data }
 async function unwrap<T>(r: Response): Promise<T> {
@@ -54,13 +51,4 @@ export const api = {
   // throws like every other method, so no caller has to know about HTTP status codes
   setTaskDone: (projectId: string, taskId: string, done: boolean): Promise<void> =>
     fetch(`${BASE}/projects/${projectId}/tasks/${taskId}`, send('PATCH', { done })).then(r => unwrap<void>(r)),
-
-  getMeme: (query: string): Promise<Meme> =>
-    fetch(`${BASE}/memes?q=${encodeURIComponent(query)}`).then(r => unwrap<Meme>(r)),
-
-  listTeams: (): Promise<Team[]> =>
-    fetch(`${BASE}/teams`).then(r => unwrap<Team[]>(r)),
-
-  createIssues: (teamId: string, tasks: unknown[]): Promise<{ created: CreatedIssue[]; relationErrors?: string[] }> =>
-    fetch(`${BASE}/issues`, send('POST', { teamId, tasks })).then(r => unwrap(r)),
 }

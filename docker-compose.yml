@@ -13,8 +13,6 @@ services:
     command: npx tsx server/index.ts
     environment:
       MONGODB_URI: mongodb://mongo:27017/plan-to-linear
-      LINEAR_API_KEY: ${LINEAR_API_KEY:-}
-      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
     depends_on:
       - mongo
 

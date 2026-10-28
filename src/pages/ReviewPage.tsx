@@ -1,151 +1,191 @@
-import { Fragment, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
-import { resolveDepIndex, type Task } from '../../shared/parse'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import type { Task } from '../../shared/parse'
 import { groupTasks } from '../../shared/groups'
-
-// add-or-remove into a copy — React needs a new Set to see the change
-const toggled = (set: Set<number>, i: number) => {
-  const next = new Set(set)
-  next.has(i) ? next.delete(i) : next.add(i)
-  return next
-}
-import { TaskCard } from '../components/TaskCard'
+import { TaskBody, TaskRow, CopyButton } from '../components/TaskCard'
 import { CardViewer } from '../components/CardViewer'
-import { ThemeToggle } from '../components/ThemeToggle'
 import { DiagramPanel } from '../components/DiagramPanel'
 import { SpecPanel } from '../components/SpecPanel'
+import { Icon } from '../components/Icon'
 import type { Spec } from '../lib/api'
+import { hasSidePane, isTypingTarget, pad, toggled } from '../lib/ui'
 
-export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, saveError, backLabel, onBack, onShip, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [] }: {
+export type SyncState = 'saved' | 'syncing' | 'error'
+
+type Pane = 'flow' | 'seq' | 'spec'
+
+const SYNC_LABEL: Record<SyncState, string> = { saved: 'Saved · live', syncing: 'Syncing…', error: 'Not saved' }
+
+export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sync, syncError, projectId, onEdit, onMenu, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [], flash = null }: {
   planTitle: string
   tasks: Task[]
   done: Set<number>
   setDone: Dispatch<SetStateAction<Set<number>>>
   view: 'focus' | 'list'
   setView: (v: 'focus' | 'list') => void
-  saveError: string
-  backLabel: string
-  onBack: () => void
-  onShip: () => void
+  sync: SyncState
+  syncError: string
+  projectId: string | null
+  onEdit: () => void
+  onMenu: () => void
   diagram: string
   seqDiagram?: string
   spec?: Spec | null
+  /** diagram node ids per task, index-aligned with `tasks` */
   taskNodes: string[][]
   /** spec entry ids per task, index-aligned with `tasks` — the counterpart of `taskNodes` */
   taskRefs?: string[][]
+  /** tasks just changed through the API (App clears it once the flash has played) */
+  flash?: { indices: Set<number>; n: number } | null
 }) {
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
-  // task indices whose detail is open — empty means the list opens as scannable name rows,
-  // and it is a set (not one index) so opening a task never closes another
+  // task indices whose detail is open — a set (not one index) so opening a task never closes another
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  // which of flowchart / sequence / spec fills the side column; falls back to whichever exists,
-  // so a project that has only one of the three needs no toggle and never renders an empty panel
-  const [pane, setPane] = useState<'flow' | 'seq' | 'spec'>('flow')
-  const shownDiagram = pane === 'seq' && seqDiagram ? seqDiagram : diagram || seqDiagram
-  const showSpec = spec ? pane === 'spec' || !shownDiagram : false
-  const sideCol = Boolean(shownDiagram || showSpec)
+  // which of flowchart / sequence / spec fills the side pane; falls back to whichever exists, so a
+  // project that has only one of the three needs no toggle and never renders an empty pane
+  const [pane, setPane] = useState<Pane>('flow')
+  const [specRaw, setSpecRaw] = useState(false)
+  const [ping, setPing] = useState<{ id: string; n: number } | null>(null)
+  const [ctxOpen, setCtxOpen] = useState(false) // only matters below 1180px, where the pane is a drawer
+
+  // the chosen pane if this project has it, else the first one it does have
+  const has: Record<Pane, boolean> = { flow: Boolean(diagram), seq: Boolean(seqDiagram), spec: Boolean(spec) }
+  const current: Pane = has[pane] ? pane : diagram ? 'flow' : seqDiagram ? 'seq' : 'spec'
+  const showSpec = current === 'spec'
+  const shownDiagram = current === 'seq' ? seqDiagram : diagram
+  const hasCtx = hasSidePane({ diagram, seqDiagram, spec })
   const active = view === 'focus' ? focusTop : selected
   // independent tracks: no track depends on a task in another, so each can be handed off separately
   const tracks = useMemo(() => groupTasks(tasks), [tasks])
-  const renderTask = (i: number) => (
-    <TaskCard
-      key={i}
-      task={tasks[i]}
-      index={i}
-      checked={done.has(i)}
-      resolveDep={dep => {
-        const di = resolveDepIndex(tasks, dep)
-        return di === -1 ? null : { done: done.has(di) }
-      }}
-      onToggle={() => setDone(prev => toggled(prev, i))}
-      onSelect={sideCol ? () => setSelected(i) : undefined}
-      collapsed={!expanded.has(i)}
-      onToggleExpand={() => setExpanded(prev => toggled(prev, i))}
-    />
-  )
-  const body = view === 'focus' ? (
-    <CardViewer tasks={tasks} done={done} setDone={setDone} onShip={onShip} onTopChange={setFocusTop} />
-  ) : (<>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px' }}>
-      <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-        ⚡ {done.size} / {tasks.length} done
-      </span>
-      <div className="progress-track">
-        <div className="progress-fill" style={{ width: `${(done.size / tasks.length) * 100}%` }} />
-      </div>
-    </div>
-    {/* one track means nothing to parallelise: render the plain list, with no root to hang a rail from */}
-    {tracks.length === 1 ? tracks[0].map(i => renderTask(i)) : tracks.map((track, ti) => (
-      // the track name is the tree's root; its tasks hang off the rail below it.
-      // Keyed by the track's lowest task index — unique, and stable across polls.
-      <Fragment key={track[0]}>
-        <div className="track-label" style={{ marginTop: ti > 0 ? 12 : 0 }}>
-          <span className="eyebrow">Track {ti + 1}</span>
-          <span className="track-count">{track.filter(i => done.has(i)).length}/{track.length} done</span>
-        </div>
-        <div className="tree">
-          {track.map(i => <div key={i} className="tree-row">{renderTask(i)}</div>)}
-        </div>
-      </Fragment>
-    ))}
-  </>)
-  return (
-    <div
-      className={sideCol ? 'review-shell' : undefined}
-      style={{ maxWidth: sideCol ? 1320 : 760, margin: '0 auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}
-    >
-      {/* layout in theme.css (.review-head) — a phone needs it full-bleed, which the inline padding
-          could not be overridden to do */}
-      <header className="review-head">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <button className="btn-ghost" onClick={onBack}>{backLabel}</button>
-          <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {planTitle || 'Untitled plan'}
-          </h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {saveError && <span style={{ fontSize: 12, color: 'var(--warn)' }} title={saveError}>⚠ not saved</span>}
-          <ThemeToggle />
-          <button className={`btn-ghost${view === 'focus' ? ' active' : ''}`} onClick={() => setView('focus')}>Focus</button>
-          <button className={`btn-ghost${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>List</button>
-          <button className="btn-primary" disabled={done.size === 0} onClick={onShip}>
-            Ship ({done.size}) →
-          </button>
-        </div>
-      </header>
+  const specIds = useMemo(() => (spec ? new Set(Object.values(spec).flat().map(e => e.id)) : null), [spec])
 
-      {sideCol ? (
-        <div className="review-split">
-          <div className="diagram-col">
-            {/* only worth a toggle row when there is more than one thing to switch between */}
-            {[diagram, seqDiagram, spec].filter(Boolean).length > 1 && (
-              <div className="diagram-toggle" style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                {diagram && (
-                  <button className={`btn-ghost${!showSpec && pane !== 'seq' ? ' active' : ''}`} onClick={() => setPane('flow')}>
-                    🗺 Flowchart
-                  </button>
-                )}
-                {seqDiagram && (
-                  <button className={`btn-ghost${!showSpec && pane === 'seq' ? ' active' : ''}`} onClick={() => setPane('seq')}>
-                    ⇄ Sequence
-                  </button>
-                )}
-                {spec && (
-                  <button className={`btn-ghost${showSpec ? ' active' : ''}`} onClick={() => setPane('spec')}>
-                    📜 Spec
-                  </button>
-                )}
-              </div>
-            )}
-            {showSpec && spec
-              ? <SpecPanel spec={spec} highlightIds={active != null ? taskRefs[active] ?? [] : []} />
-              : <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} />}
+  function showSpecEntry(id: string, from?: number) {
+    if (from !== undefined) setSelected(from)
+    setPane('spec'); setSpecRaw(false)
+    // wide screens show the pane inline; opening the drawer there would only spring it open on a later resize
+    if (matchMedia('(max-width: 1180px)').matches) setCtxOpen(true)
+    setPing(p => ({ id, n: (p?.n ?? 0) + 1 }))
+  }
+
+  function jumpInList(i: number) {
+    setSelected(i)
+    setExpanded(prev => new Set(prev).add(i))
+    requestAnimationFrame(() => document.querySelector(`[data-task="${i}"]`)?.scrollIntoView({ block: 'nearest' }))
+  }
+
+  // F / L switch views; the deck owns ← → Z
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isTypingTarget(e.target)) return
+      if (e.key === 'f') setView('focus')
+      if (e.key === 'l') setView('list')
+      if (e.key === 'Escape') setCtxOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setView])
+
+  const tabs: [Pane, string][] = []
+  if (diagram) tabs.push(['flow', 'Flowchart'])
+  if (seqDiagram) tabs.push(['seq', 'Sequence'])
+  if (spec) tabs.push(['spec', 'Spec'])
+
+  const list = (
+    <div className="list">
+      <div className="progress">
+        <div className="bar"><i className="d" style={{ width: `${(done.size / tasks.length) * 100}%` }} /></div>
+        <span className="progress-txt num"><b>{done.size}</b>/{tasks.length} approved</span>
+        <button className="btn btn-ghost sm" onClick={() => setExpanded(expanded.size ? new Set() : new Set(tasks.map((_, i) => i)))}>
+          {expanded.size ? 'Collapse all' : 'Expand all'}
+        </button>
+      </div>
+      {tracks.map((track, ti) => (
+        // keyed by the track's lowest task index — unique, and stable across polls
+        <section key={track[0]}>
+          {tracks.length > 1 && (
+            <div className="track-head">
+              <span className="eyebrow">Track {ti + 1}</span>
+              <span className="note num">{track.filter(i => done.has(i)).length}/{track.length} approved</span>
+              {ti === 0 && <span className="note push hide-mobile">Tracks share no dependencies, so each can go to a different person</span>}
+            </div>
+          )}
+          <div className="surface track">
+            {track.map(i => (
+              <TaskRow
+                key={i}
+                task={tasks[i]}
+                index={i}
+                checked={done.has(i)}
+                selected={selected === i}
+                expanded={expanded.has(i)}
+                flash={flash?.indices.has(i)}
+                onToggle={() => setDone(prev => toggled(prev, i))}
+                onOpen={() => { setSelected(i); setExpanded(prev => toggled(prev, i)) }}
+              >
+                <TaskBody task={tasks[i]} tasks={tasks} done={done} refs={taskRefs[i]} specIds={specIds}
+                  onJump={jumpInList} onSpecRef={id => showSpecEntry(id, i)} />
+              </TaskRow>
+            ))}
           </div>
-          <div className="task-col" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-            {body}
-          </div>
-        </div>
-      ) : body}
+        </section>
+      ))}
     </div>
   )
+
+  return (<>
+    <main className="main">
+      <header className="head">
+        <button className="btn btn-ghost sq only-mobile" onClick={onMenu} aria-label="Open projects"><Icon name="menu" /></button>
+        <h1 title={planTitle}>{planTitle || 'Untitled plan'}</h1>
+        <span className="sync hide-mobile" data-s={sync} title={syncError || undefined} role="status"><i /><span>{SYNC_LABEL[sync]}</span></span>
+        <span className="grow" />
+        <div className="seg" role="tablist" aria-label="Review mode">
+          <button role="tab" aria-selected={view === 'focus'} onClick={() => setView('focus')} title="Focus (F)"><Icon name="cards" /><span className="hide-mobile">Focus</span></button>
+          <button role="tab" aria-selected={view === 'list'} onClick={() => setView('list')} title="List (L)"><Icon name="list" /><span className="hide-mobile">List</span></button>
+        </div>
+        {hasCtx && <button className="btn btn-ghost sq only-narrow" onClick={() => setCtxOpen(true)} aria-label="Show diagram and spec"><Icon name="panel" /></button>}
+        <button className="btn btn-ghost sq hide-mobile" onClick={onEdit} aria-label="Edit as markdown" title="Edit as markdown"><Icon name="edit" /></button>
+        {projectId && (
+          <CopyButton icon="link" label="Copy link" iconOnly className="hide-mobile" title="Copy a link that opens this project"
+            text={() => `${location.origin}/?project=${projectId}`} />
+        )}
+      </header>
+      <div className="body">
+        {view === 'focus'
+          ? <CardViewer tasks={tasks} done={done} setDone={setDone} onTopChange={setFocusTop}
+              taskRefs={taskRefs} specIds={specIds} onSpecRef={id => showSpecEntry(id)} flash={flash} />
+          : list}
+      </div>
+    </main>
+    {hasCtx && (<>
+      {ctxOpen && <div className="scrim ctx-scrim" onClick={() => setCtxOpen(false)} />}
+      <aside className={`ctx${ctxOpen ? ' open' : ''}`} aria-label="Diagram and spec">
+        <div className="ctx-head">
+          {tabs.length > 1 && (
+            <div className="seg" role="tablist" aria-label="Context view">
+              {tabs.map(([k, label]) => (
+                <button key={k} role="tab" aria-selected={current === k} onClick={() => setPane(k)}><Icon name={k} />{label}</button>
+              ))}
+            </div>
+          )}
+          <span className="grow" />
+          {showSpec && (
+            <button className="btn btn-ghost sm" aria-pressed={specRaw} onClick={() => setSpecRaw(r => !r)}>
+              {specRaw ? 'Rendered' : 'Raw JSON'}
+            </button>
+          )}
+          <button className="btn btn-ghost sq only-narrow" onClick={() => setCtxOpen(false)} aria-label="Close panel"><Icon name="x" /></button>
+        </div>
+        <div className="ctx-focus">
+          {active != null && tasks[active]
+            ? <><span className="dot" /><span>Highlighting</span><b>{pad(active)} · {tasks[active].title}</b></>
+            : <span>{view === 'list' ? 'Select a task to highlight what it touches' : 'Nothing to highlight'}</span>}
+        </div>
+        {showSpec && spec
+          ? <SpecPanel spec={spec} highlightIds={active != null ? taskRefs[active] ?? [] : []} raw={specRaw} ping={ping} />
+          : <DiagramPanel source={shownDiagram} highlightNodes={active != null ? taskNodes[active] ?? [] : []} spec={spec} />}
+      </aside>
+    </>)}
+  </>)
 }

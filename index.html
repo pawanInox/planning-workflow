@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plan to Linear</title>
+  <title>Yak Dai</title>
   <script>
     (function () {
-      var t = localStorage.theme || 'system'
+      var t = 'system'
+      try { t = localStorage.theme || t } catch (e) {}
       var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
       document.documentElement.dataset.theme = dark ? 'dark' : 'light'
     })()
   </script>
-  <!-- UI type is the system humanist sans; no web font to load -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
 <body>
   <div id="root"></div>
