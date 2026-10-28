@@ -35,6 +35,8 @@ export type Spec = Record<string, SpecEntry[]>
 export type Project = {
   id: string
   title: string
+  /** the users id of the account that owns it; absent on projects saved before sign-in existed */
+  ownerId?: string
   /** Mermaid source of the project's architecture flowchart, generated at planning time. */
   diagram?: string
   /** Mermaid source of the project's sequence diagram (participant ids match `diagram`'s node ids). */
@@ -47,11 +49,23 @@ export type Project = {
 
 export type ProjectWithTasks = Project & { tasks: TaskEntity[] }
 
+/** What a reader gets back: the project plus who owns it (never their email) and whether the caller may change it. */
+export type ProjectView = ProjectWithTasks & { owner: Pick<User, 'id' | 'name' | 'avatarUrl'> | null; canEdit: boolean }
+
 /** What it takes to create a project. Spelled out once — repository, service and every fake of
  *  them share it, so adding a project field is one edit rather than six. */
-export type NewProject = { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string; spec?: Spec }
+export type NewProject = { title: string; tasks: NewTask[]; diagram?: string; sequenceDiagram?: string; spec?: Spec; ownerId?: string }
 
 /** An update: every field optional and merged on its own, EXCEPT `tasks`, which replaces the lot. */
-export type ProjectPatch = Partial<NewProject>
+export type ProjectPatch = Partial<Omit<NewProject, 'ownerId'>>
 
 export type ProjectSummary = { project: Project; taskCount: number; doneCount: number }
+
+/** A Google account that has signed in. `googleSub` is the identity key; the email can change. */
+export type User = { id: string; googleSub: string; email: string; name: string; avatarUrl: string | null }
+
+/** What a request knows about its caller — never the googleSub. */
+export type AuthUser = Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>
+
+/** A personal API token as stored: only the hash and the last 4 characters of the raw value. */
+export type ApiTokenRow = { id: string; userId: string; name: string; tokenHash: string; last4: string; createdAt: Date; lastUsedAt: Date | null }

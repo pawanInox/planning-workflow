@@ -31,6 +31,8 @@ const PATHS = {
   'tracks': '<path d="M6 4v16M18 4v6M18 14v6"/><circle cx="18" cy="12" r="2"/>',
   'live': '<path d="M4 12a8 8 0 0113.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.7L4 15.5M4 20v-4.5h4.5"/>',
   'retry': '<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5"/>',
+  'key': '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/>',
+  'logout': '<path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l4 4-4 4M19 12H9"/>',
   'code': '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
   'monitor': '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
 } as const

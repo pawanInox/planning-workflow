@@ -6,7 +6,7 @@ import { CardViewer } from '../components/CardViewer'
 import { DiagramPanel } from '../components/DiagramPanel'
 import { SpecPanel } from '../components/SpecPanel'
 import { Icon } from '../components/Icon'
-import type { Spec } from '../lib/api'
+import type { Owner, Spec } from '../lib/api'
 import { hasSidePane, isTypingTarget, pad, toggled } from '../lib/ui'
 
 export type SyncState = 'saved' | 'syncing' | 'error'
@@ -15,7 +15,7 @@ type Pane = 'flow' | 'seq' | 'spec'
 
 const SYNC_LABEL: Record<SyncState, string> = { saved: 'Saved · live', syncing: 'Syncing…', error: 'Not saved' }
 
-export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sync, syncError, projectId, onEdit, onMenu, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [], flash = null }: {
+export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, sync, syncError, projectId, onEdit, onMenu, diagram, seqDiagram = '', spec = null, taskNodes, taskRefs = [], flash = null, readOnly = false, owner = null }: {
   planTitle: string
   tasks: Task[]
   done: Set<number>
@@ -25,7 +25,8 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, syn
   sync: SyncState
   syncError: string
   projectId: string | null
-  onEdit: () => void
+  /** absent for a reader: only the owner may turn the plan back into markdown */
+  onEdit?: () => void
   onMenu: () => void
   diagram: string
   seqDiagram?: string
@@ -36,6 +37,9 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, syn
   taskRefs?: string[][]
   /** tasks just changed through the API (App clears it once the flash has played) */
   flash?: { indices: Set<number>; n: number } | null
+  /** someone else's project: browse and copy, never approve or edit */
+  readOnly?: boolean
+  owner?: Owner | null
 }) {
   const [focusTop, setFocusTop] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
@@ -120,6 +124,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, syn
                 selected={selected === i}
                 expanded={expanded.has(i)}
                 flash={flash?.indices.has(i)}
+                readOnly={readOnly}
                 onToggle={() => setDone(prev => toggled(prev, i))}
                 onOpen={() => { setSelected(i); setExpanded(prev => toggled(prev, i)) }}
               >
@@ -138,14 +143,21 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, syn
       <header className="head">
         <button className="btn btn-ghost sq only-mobile" onClick={onMenu} aria-label="Open projects"><Icon name="menu" /></button>
         <h1 title={planTitle}>{planTitle || 'Untitled plan'}</h1>
-        <span className="sync hide-mobile" data-s={sync} title={syncError || undefined} role="status"><i /><span>{SYNC_LABEL[sync]}</span></span>
+        {readOnly ? (
+          <span className="chip reader-badge" title="Approvals and edits belong to the owner">
+            {owner?.avatarUrl && <img className="avatar sm" src={owner.avatarUrl} alt="" referrerPolicy="no-referrer" />}
+            Read-only · {owner ? `owned by ${owner.name}` : 'no owner yet'}
+          </span>
+        ) : (
+          <span className="sync hide-mobile" data-s={sync} title={syncError || undefined} role="status"><i /><span>{SYNC_LABEL[sync]}</span></span>
+        )}
         <span className="grow" />
         <div className="seg" role="tablist" aria-label="Review mode">
           <button role="tab" aria-selected={view === 'focus'} onClick={() => setView('focus')} title="Focus (F)"><Icon name="cards" /><span className="hide-mobile">Focus</span></button>
           <button role="tab" aria-selected={view === 'list'} onClick={() => setView('list')} title="List (L)"><Icon name="list" /><span className="hide-mobile">List</span></button>
         </div>
         {hasCtx && <button className="btn btn-ghost sq only-narrow" onClick={() => setCtxOpen(true)} aria-label="Show diagram and spec"><Icon name="panel" /></button>}
-        <button className="btn btn-ghost sq hide-mobile" onClick={onEdit} aria-label="Edit as markdown" title="Edit as markdown"><Icon name="edit" /></button>
+        {onEdit && <button className="btn btn-ghost sq hide-mobile" onClick={onEdit} aria-label="Edit as markdown" title="Edit as markdown"><Icon name="edit" /></button>}
         {projectId && (
           <CopyButton icon="link" label="Copy link" iconOnly className="hide-mobile" title="Copy a link that opens this project"
             text={() => `${location.origin}/?project=${projectId}`} />
@@ -154,7 +166,7 @@ export function ReviewPage({ planTitle, tasks, done, setDone, view, setView, syn
       <div className="body">
         {view === 'focus'
           ? <CardViewer tasks={tasks} done={done} setDone={setDone} onTopChange={setFocusTop}
-              taskRefs={taskRefs} specIds={specIds} onSpecRef={id => showSpecEntry(id)} flash={flash} />
+              taskRefs={taskRefs} specIds={specIds} onSpecRef={id => showSpecEntry(id)} flash={flash} readOnly={readOnly} />
           : list}
       </div>
     </main>

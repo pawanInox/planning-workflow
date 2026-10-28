@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { parsePlan, planToMarkdown } from '../shared/parse'
-import { api, type ProjectsPage as ProjectsPageData, type ProjectSummary, type ProjectWithTasks, type Spec } from './lib/api'
+import { api, ApiError, setUnauthorizedHandler, type AuthUser, type Owner, type ProjectsPage as ProjectsPageData, type ProjectSummary, type ProjectWithTasks, type Spec } from './lib/api'
 import { Sidebar } from './components/Sidebar'
 import { Icon } from './components/Icon'
 import type { SyncState } from './pages/ReviewPage'
@@ -10,8 +10,12 @@ import { hasSidePane, pad } from './lib/ui'
 const InputPage = lazy(() => import('./pages/InputPage').then(m => ({ default: m.InputPage })))
 const ReviewPage = lazy(() => import('./pages/ReviewPage').then(m => ({ default: m.ReviewPage })))
 const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })))
+const SignInPage = lazy(() => import('./pages/SignInPage').then(m => ({ default: m.SignInPage })))
 
 export function App() {
+  // 'checking' until /auth/me answers; null = signed out (every app screen shows the sign-in page)
+  const [auth, setAuth] = useState<AuthUser | null | 'checking'>('checking')
+  const [authError, setAuthError] = useState(() => new URLSearchParams(window.location.search).get('authError'))
   const [md, setMd] = useState('')
   const [step, setStep] = useState<'home' | 'input' | 'review'>('home')
   const [view, setView] = useState<'focus' | 'list'>('focus')
@@ -24,6 +28,9 @@ export function App() {
   const [diagram, setDiagram] = useState('')
   const [seqDiagram, setSeqDiagram] = useState('')
   const [spec, setSpec] = useState<Spec | null>(null)
+  // someone else's project opens read-only; a fresh, unsaved plan is always mine to edit
+  const [owner, setOwner] = useState<Owner | null>(null)
+  const [canEdit, setCanEdit] = useState(true)
   const [taskNodes, setTaskNodes] = useState<string[][]>([]) // diagram node ids per task, index-aligned with tasks
   const [taskRefs, setTaskRefs] = useState<string[][]>([]) // spec entry ids per task, index-aligned with tasks
   const [projectsPage, setProjectsPage] = useState<ProjectsPageData | null>(null)
@@ -59,22 +66,39 @@ export function App() {
     setTaskNodes(p.tasks.map(t => t.diagramNodes ?? []))
     setTaskRefs(p.tasks.map(t => t.specRefs ?? []))
     setProjectId(p.id)
+    setOwner(p.owner)
+    setCanEdit(p.canEdit)
     syncedDone.current = doneSet
     serverMd.current = fresh
     serverTasks.current = p.tasks
   }
 
-  // deep link: /?project=<id> opens that project straight into review, /?page=new the paste screen,
-  // /?page=projects the paste screen with the project list open. Bare / is the homepage.
+  // Who am I first, then the deep link: /?project=<id> opens that project straight into review,
+  // /?page=new the paste screen, /?page=projects the paste screen with the project list open. Bare /
+  // is the public homepage. Signed out, any app URL shows the sign-in page and the URL is left exactly
+  // as typed, so signing in comes back to it.
   useEffect(() => {
+    setUnauthorizedHandler(() => setAuth(null)) // a session that expires mid-review
     const params = new URLSearchParams(window.location.search)
     const pid = params.get('project')
-    if (pid) openProject(pid).finally(() => { deepLinkPending.current = false })
-    else {
-      deepLinkPending.current = false
-      if (params.get('page') === 'projects') { setStep('input'); setNavOpen(true) }
-      else if (params.get('page') === 'new') setStep('input')
-    }
+    const wantsApp = Boolean(pid || params.get('page') || params.get('authError'))
+    api.me()
+      .then(({ user }) => {
+        setAuth(user)
+        if (pid) openProject(pid).finally(() => { deepLinkPending.current = false })
+        else {
+          deepLinkPending.current = false
+          if (params.get('page') === 'projects') { setStep('input'); setNavOpen(true) }
+          else if (params.get('page') === 'new' || params.get('authError')) setStep('input')
+        }
+      })
+      .catch(e => {
+        // only a 401 means signed out; anything else is the server, and the sign-in screen says so
+        if (!(e instanceof ApiError && e.status === 401)) setAuthError('unavailable')
+        setAuth(null)
+        deepLinkPending.current = true // hold the URL still while signed out
+        if (wantsApp) setStep('input')
+      })
   }, [])
 
   // mirror the current page into the URL so reload and copy-link restore it
@@ -84,29 +108,40 @@ export function App() {
       : step === 'input' && navOpen ? '/?page=projects'
       : step === 'input' ? '/?page=new'
       : '/'
-    // a deep link is still resolving — rewriting the URL now would drop the id it carries
-    if (deepLinkPending.current) return
+    // a deep link is still resolving (or we are signed out) — rewriting the URL now would drop
+    // the id it carries, and with it the page sign-in should come back to
+    if (deepLinkPending.current || !auth || auth === 'checking') return
     if (window.location.pathname + window.location.search !== url) {
       window.history.replaceState(null, '', url)
     }
-  }, [step, projectId, navOpen])
+  }, [step, projectId, navOpen, auth])
 
   // the sidebar is on every app screen, so refresh it whenever the open project changes too
   useEffect(() => {
-    if (step === 'home') return
+    if (step === 'home' || !auth || auth === 'checking') return
     api.listProjects(page)
       .then(p => { setProjectsPage(p); setListError('') })
       .catch(e => setListError(String(e.message ?? e)))
-  }, [step, page, projectId])
+  }, [step, page, projectId, auth])
 
   // reflect external edits (e.g. Claude PATCHing tasks via the API) while reviewing
+  const signedIn = !!auth && auth !== 'checking'
   useEffect(() => {
-    if (step !== 'review' || !projectId) return
+    if (step !== 'review' || !projectId || !signedIn) return // a 401 mid-review stops the poll too
     const poll = setInterval(async () => {
       if (document.hidden) return // a backgrounded tab would otherwise poll forever
       try {
         const p = await api.getProject(projectId)
-        if (planToMarkdown(p.title, p.tasks) === serverMd.current) return
+        if (planToMarkdown(p.title, p.tasks) === serverMd.current) {
+          // Approvals are not part of the markdown. The owner's own toggles are the truth locally (the
+          // done-sync effect writes them), but a reader only ever learns of the owner's approvals here.
+          if (!p.canEdit) {
+            const serverDone = new Set(p.tasks.flatMap((t, i) => (t.done ? [i] : [])))
+            setDone(prev => (prev.size === serverDone.size && [...prev].every(i => serverDone.has(i)) ? prev : serverDone))
+            syncedDone.current = serverDone
+          }
+          return
+        }
         // ponytail: a done-toggle PATCH racing an external edit can be briefly overwritten; refetch-after-write if it ever matters
         const changed = p.tasks.flatMap((t, i) => {
           const was = serverTasks.current[i]
@@ -120,7 +155,7 @@ export function App() {
       } catch { /* api unreachable — keep reviewing locally */ }
     }, 3000)
     return () => clearInterval(poll)
-  }, [step, projectId])
+  }, [step, projectId, signedIn])
 
   useEffect(() => {
     if (!notice) return
@@ -144,7 +179,7 @@ export function App() {
 
   // live-sync done toggles (List clicks and Focus swipes both go through setDone)
   useEffect(() => {
-    if (!projectId) return
+    if (!projectId || !canEdit) return // a reader's view never writes: approvals belong to the owner
     const prev = syncedDone.current
     const patch = (i: number, isDone: boolean) => {
       const tid = taskIds[i]
@@ -152,7 +187,10 @@ export function App() {
       setPendingPatches(n => n + 1)
       api.setTaskDone(projectId, tid, isDone)
         .then(() => setUnsynced(m => { if (!m.has(i)) return m; const next = new Map(m); next.delete(i); return next }))
-        .catch(e => setUnsynced(m => new Map(m).set(i, `Approval for task ${pad(i)} was not saved: ${e.message ?? e}`)))
+        .catch(e => {
+          if (e instanceof ApiError && e.status === 403) setOpenError(e.message) // ownership changed under us
+          setUnsynced(m => new Map(m).set(i, `Approval for task ${pad(i)} was not saved: ${e.message ?? e}`))
+        })
         .finally(() => setPendingPatches(n => n - 1))
     }
     for (const i of done) if (!prev.has(i)) patch(i, true)
@@ -162,6 +200,7 @@ export function App() {
 
   async function saveProject() {
     if (savingRef.current) return
+    if (projectId && !canEdit) return // a reader never saves; the server would 403 anyway
     // A PUT replaces every task with fresh ids, so re-saving an unchanged plan invalidates the
     // ids the done-sync effect is holding — any toggle racing it then PATCHes a deleted task and
     // is silently lost. Nothing changed means nothing to save.
@@ -222,7 +261,9 @@ export function App() {
       if (wasLastOnPage) setPage(page - 1)
       else setProjectsPage(await api.listProjects(page)) // refetch: the page's contents shifted up
     } catch (e: any) {
-      setListError(String(e.message ?? e))
+      // "not yours" is a message about this action, not a broken API — keep the sidebar's status out of it
+      if (e instanceof ApiError && e.status === 403) setOpenError(e.message)
+      else setListError(String(e.message ?? e))
     }
   }
 
@@ -232,6 +273,7 @@ export function App() {
     setMd(value)
     setDone(new Set())
     setProjectId(null); setTaskIds([])
+    setOwner(null); setCanEdit(true) // an edited plan is a new plan, and it is mine
     setDiagram(''); setSeqDiagram(''); setSpec(null); setTaskNodes([]); setTaskRefs([])
     syncedDone.current = new Set(); serverMd.current = ''
     setSaveError(''); setUnsynced(new Map())
@@ -250,6 +292,12 @@ export function App() {
 
   const hasCtx = step === 'review' && hasSidePane({ diagram, seqDiagram, spec })
   const activeDone = projectId ? [...done].filter(i => taskIds[i]).length : null
+  // the URL is never rewritten while signed out, so it still names the page sign-in should return to;
+  // a bare / here means "Open app" was clicked on the homepage, which lands on the paste screen
+  const returnParams = new URLSearchParams(window.location.search)
+  returnParams.delete('authError') // a failed attempt's reason must not ride along into the next one
+  const returnTo = returnParams.size ? `${window.location.pathname}?${returnParams}` : '/?page=new'
+  const signOut = () => { api.logout().catch(() => {}).finally(() => window.location.assign('/')) }
 
   return (<>
     <div className="toasts" aria-live="polite">
@@ -270,6 +318,8 @@ export function App() {
     <Suspense fallback={null}>
       {step === 'home' ? (
         <HomePage onOpen={() => setStep('input')} onProjects={() => { setStep('input'); setNavOpen(true) }} />
+      ) : auth === 'checking' ? null : auth === null ? (
+        <SignInPage returnTo={returnTo} authError={authError} onHome={() => setStep('home')} />
       ) : (
         <div className={`app${hasCtx ? ' has-ctx' : ''}`}>
           <Sidebar
@@ -284,6 +334,8 @@ export function App() {
             onOpen={openProject}
             onDelete={deleteProject}
             onPageChange={setPage}
+            user={auth}
+            onSignOut={signOut}
           />
           {step === 'input' ? (
             <InputPage
@@ -305,7 +357,9 @@ export function App() {
               sync={sync}
               syncError={saveError || doneError}
               projectId={projectId}
-              onEdit={() => setStep('input')}
+              onEdit={canEdit ? () => setStep('input') : undefined}
+              readOnly={!canEdit}
+              owner={owner}
               onMenu={() => setNavOpen(true)}
               diagram={diagram}
               seqDiagram={seqDiagram}

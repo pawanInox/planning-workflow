@@ -90,6 +90,7 @@
     0px 0px 0px 1px oklch(0 0 0 / 0.06),
     0px 8px 16px -4px oklch(0 0 0 / 0.08),
     0px 24px 48px -12px oklch(0 0 0 / 0.14);
+  --image-outline: oklch(0 0 0 / 0.1); /* avatars: pure black at 10%, never a tinted neutral (better-ui) */
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -132,6 +133,7 @@
   --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.08);
   --shadow-border-hover: 0 0 0 1px oklch(1 0 0 / 0.13);
   --shadow-pop: 0 0 0 1px oklch(1 0 0 / 0.1), 0 24px 48px -12px oklch(0 0 0 / 0.6);
+  --image-outline: oklch(1 0 0 / 0.1);
 }
 /* increased contrast: each appearance gets its own values, >= 0.15 OKLCH L further from its background */
 @media (prefers-contrast: more) {
@@ -186,6 +188,7 @@ p { text-wrap: pretty; margin: 0; }
 
 /* ---------- buttons ---------- */
 .btn {
+  text-decoration: none; /* an <a class="btn"> (sign-in) must not look like inline link text */
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 32px; padding-inline: 12px; border-radius: 8px;
   font-size: 13px; font-weight: 500; white-space: nowrap;
@@ -469,7 +472,7 @@ kbd {
 .row-main[aria-expanded="true"] .chev { rotate: 180deg; }
 .row-detail { padding: 4px 16px 18px 70px; }
 .row-detail .tools { display: flex; gap: 6px; margin-bottom: 4px; }
-@media (hover: hover) { .trow:not(.sel):hover { background: var(--color-bg-hover); } .check:hover { border-color: var(--color-success-solid); } }
+@media (hover: hover) { .trow:not(.sel):hover { background: var(--color-bg-hover); } .check:not(:disabled):hover { border-color: var(--color-success-solid); } }
 
 /* ================= CONTEXT PANE ================= */
 .ctx { border-left: 1px solid var(--color-border-separator); background: var(--color-bg-subtle); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
@@ -691,3 +694,67 @@ dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18
 /* the project drawer only exists below 760px; above it the sidebar is always visible, so no scrim */
 .scrim.nav-scrim { display: none; }
 @media (max-width: 760px) { .scrim.nav-scrim { display: block; } }
+
+/* ================= AUTH ================= */
+/* sign-in screen: the landing nav over one centred card */
+.signin { min-height: 100dvh; display: flex; flex-direction: column; }
+.signin .l-nav { width: 100%; } /* auto margins in a flex column would otherwise shrink it to its content */
+.signin-card {
+  margin: 8vh auto 40px; width: min(440px, calc(100vw - 32px)); padding: 32px 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; border-radius: 16px;
+}
+.signin-card h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.signin-card p { color: var(--color-text-secondary); font-size: 14px; }
+.signin-card .callout { margin: 0; text-align: left; }
+.brand-mark.lg { width: 44px; height: 44px; border-radius: 12px; }
+.brand-mark.lg .ic { width: 24px; height: 24px; }
+
+/* avatars are content images: the 1px inset outline in pure black/white (better-ui), never a tint */
+.avatar { width: 24px; height: 24px; border-radius: 50%; flex: none; object-fit: cover; outline: 1px solid var(--image-outline); outline-offset: -1px; }
+.avatar.sm { width: 16px; height: 16px; }
+.avatar-initial { display: grid; place-items: center; background: var(--color-bg-muted); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; outline: none; }
+
+/* account menu: a native <details> in the sidebar footer; the menu opens upward */
+.side-status { padding: 6px 12px; border-top: 1px solid var(--color-border-separator); }
+.account { position: relative; flex: 1; min-width: 0; }
+.account-btn {
+  list-style: none; display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; cursor: pointer;
+  transition-property: background-color; transition-duration: 120ms; transition-timing-function: ease-out;
+}
+.account-btn::-webkit-details-marker { display: none; }
+.account-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-btn .chev { color: var(--color-text-tertiary); width: 14px; height: 14px; }
+.account[open] .account-btn .chev { rotate: 180deg; }
+.account-menu {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 30; padding: 4px; border-radius: 12px; /* 12 = 8 + 4 */
+  display: flex; flex-direction: column; gap: 2px; background: var(--color-bg-surface);
+  border: 1px solid transparent; box-shadow: var(--shadow-pop);
+}
+.account-menu .btn { justify-content: flex-start; width: 100%; color: var(--color-text-primary); }
+.account-email { padding: 6px 10px 4px; font-size: 12px; color: var(--color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .account-btn:hover { background: var(--color-bg-hover); } }
+
+/* a reader's header badge: neutral, not an accent fill — one filled action per view */
+.reader-badge { height: 26px; gap: 6px; padding-inline: 8px; color: var(--color-text-secondary); white-space: nowrap; }
+.card.top.viewer { cursor: default; }
+
+/* API tokens dialog */
+dialog.tokens { width: min(520px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 32px)); overflow-y: auto; overscroll-behavior: contain; }
+.tokens-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.tokens-head form { margin: 0; }
+dialog.tokens > p { margin-bottom: 14px; }
+.token-new { display: flex; gap: 8px; margin: 14px 0; }
+input.input {
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px; border-radius: 8px; font-size: 13px;
+  background: var(--color-bg-surface); border: 1px solid var(--color-border-strong); /* form inputs keep a real >= 3:1 border */
+}
+.token-fresh { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--color-success-subtle); }
+.token-raw { display: block; padding: 8px 10px; border-radius: 8px; background: var(--color-bg-surface); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.token-fresh-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--color-text-primary); }
+.token-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.token-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.token-list li + li { border-top: 1px solid var(--color-border-separator); }
+.token-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--color-text-secondary); }
+.token-meta b { color: var(--color-text-primary); font-size: 13.5px; }
+.token-meta .mono { font-family: var(--mono); font-size: 12px; }
+.token-empty { color: var(--color-text-secondary); font-size: 13px; }

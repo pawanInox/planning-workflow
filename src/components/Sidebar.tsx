@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
-import type { ProjectsPage, ProjectSummary } from '../lib/api'
+import { useEffect, useRef, useState } from 'react'
+import type { AuthUser, ProjectsPage, ProjectSummary } from '../lib/api'
 import { Icon } from './Icon'
 import { ThemeToggle } from './ThemeToggle'
+import { TokensDialog } from './TokensDialog'
 
 const ago = (iso: string) => {
   const h = (Date.now() - new Date(iso).getTime()) / 36e5
@@ -10,7 +11,7 @@ const ago = (iso: string) => {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export function Sidebar({ page, error, activeId, activeDone, open, onClose, onHome, onNewPlan, onOpen, onDelete, onPageChange }: {
+export function Sidebar({ page, error, activeId, activeDone, open, onClose, onHome, onNewPlan, onOpen, onDelete, onPageChange, user, onSignOut }: {
   page: ProjectsPage | null
   error: string
   activeId: string | null
@@ -23,8 +24,33 @@ export function Sidebar({ page, error, activeId, activeDone, open, onClose, onHo
   onOpen: (id: string) => void
   onDelete: (p: ProjectSummary) => void
   onPageChange: (page: number) => void
+  user: AuthUser
+  onSignOut: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const tokensDialog = useRef<HTMLDialogElement>(null)
+  const account = useRef<HTMLDetailsElement>(null)
+  // <details> has no light-dismiss: close it on an outside click or Escape, like any popover
+  useEffect(() => {
+    const close = (e: Event) => {
+      const d = account.current
+      if (!d?.open) return
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !d.contains(e.target as Node)) {
+        d.removeAttribute('open')
+        if (e instanceof KeyboardEvent) d.querySelector('summary')?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', close) }
+  }, [])
+  const [tokensOpen, setTokensOpen] = useState(false)
+
+  function openTokens() {
+    account.current?.removeAttribute('open') // close the menu behind the dialog
+    setTokensOpen(true)
+    tokensDialog.current?.showModal()
+  }
   const [pending, setPending] = useState<ProjectSummary | null>(null)
   const items = page?.items ?? []
   const first = page ? (page.page - 1) * page.limit + 1 : 0
@@ -84,13 +110,31 @@ export function Sidebar({ page, error, activeId, activeDone, open, onClose, onHo
           </button>
         </nav>
       )}
+      {error && (
+        <div className="side-status">
+          <span className="api-dot down" title={error}><i />API unavailable</span>
+        </div>
+      )}
       <div className="side-foot">
-        <span className={`api-dot${error ? ' down' : ''}`} title={error || 'API and MongoDB reachable'}>
-          <i />{error ? 'API unavailable' : 'API connected'}
-        </span>
+        {/* a native disclosure (not an ARIA menu): keyboard toggling and focus come for free */}
+        <details ref={account} className="account">
+          <summary className="account-btn" aria-label={`Account: ${user.name}`}>
+            {user.avatarUrl
+              ? <img className="avatar" src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
+              : <span className="avatar avatar-initial" aria-hidden="true">{user.name.slice(0, 1).toUpperCase()}</span>}
+            <span className="account-name">{user.name}</span>
+            <Icon name="chev-d" className="chev" />
+          </summary>
+          <div className="account-menu">
+            <div className="account-email">{user.email}</div>
+            <button className="btn btn-ghost lead" onClick={openTokens}><Icon name="key" />API tokens</button>
+            <button className="btn btn-ghost lead" onClick={onSignOut}><Icon name="logout" />Sign out</button>
+          </div>
+        </details>
         <ThemeToggle />
       </div>
     </aside>
+    <TokensDialog ref={tokensDialog} open={tokensOpen} onClose={() => setTokensOpen(false)} />
     <dialog ref={dialog} onClose={() => {
       if (dialog.current?.returnValue === 'ok' && pending) onDelete(pending)
       setPending(null)

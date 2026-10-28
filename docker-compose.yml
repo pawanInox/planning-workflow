@@ -13,6 +13,9 @@ services:
     command: npx tsx server/index.ts
     environment:
       MONGODB_URI: mongodb://mongo:27017/plan-to-linear
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:5173}
     depends_on:
       - mongo
 

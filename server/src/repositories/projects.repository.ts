@@ -5,9 +5,10 @@ import { SpecModel, toSpec } from '../models/specs/spec.model.ts'
 import { TaskModel, toTask } from '../models/tasks/task.model.ts'
 
 export class MongooseProjectRepository implements ProjectRepository {
-  async create({ title, tasks, diagram, sequenceDiagram, spec }: NewProject): Promise<ProjectWithTasks> {
+  async create({ title, tasks, diagram, sequenceDiagram, spec, ownerId }: NewProject): Promise<ProjectWithTasks> {
     const p = await ProjectModel.create({
       title,
+      ...(ownerId ? { ownerId: oid(ownerId) } : {}),
       ...(diagram !== undefined ? { diagram } : {}),
       ...(sequenceDiagram !== undefined ? { sequenceDiagram } : {}),
     })
@@ -32,9 +33,12 @@ export class MongooseProjectRepository implements ProjectRepository {
 
   // ponytail: 2 count queries per project ON THE PAGE — bounded by `limit` now, so the old N+1
   // over the whole collection is gone; switch to one aggregate only if a page gets large
-  async list({ page, limit }: { page: number; limit: number }): Promise<{ items: ProjectSummary[]; total: number }> {
-    const total = await ProjectModel.countDocuments()
-    const projects = await ProjectModel.find()
+  async list({ ownerId, page, limit }: { ownerId: string; page: number; limit: number }): Promise<{ items: ProjectSummary[]; total: number }> {
+    const owner = oid(ownerId)
+    if (!owner) return { items: [], total: 0 } // a malformed owner id owns nothing
+    const filter = { ownerId: owner }
+    const total = await ProjectModel.countDocuments(filter)
+    const projects = await ProjectModel.find(filter)
       // the list controller serializes only id, title, the two counts and updatedAt — both mermaid
       // sources would be transferred and thrown away. getById keeps them; the review screen needs them.
       .select('-diagram -sequenceDiagram')

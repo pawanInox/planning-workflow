@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { ZodError } from 'zod'
-import { NotFoundError, ServiceUnavailableError } from '../services/errors.ts'
+import { BadRequestError, ForbiddenError, NotFoundError, ServiceUnavailableError, UnauthorizedError } from '../services/errors.ts'
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
@@ -10,6 +10,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       details: err.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
     })
   }
+  if (err instanceof BadRequestError) return res.status(400).json({ status: 'error', message: err.message })
+  if (err instanceof UnauthorizedError) return res.status(401).json({ status: 'error', message: err.message })
+  if (err instanceof ForbiddenError) return res.status(403).json({ status: 'error', message: err.message })
   if (err instanceof NotFoundError) return res.status(404).json({ status: 'error', message: err.message })
   if (err instanceof ServiceUnavailableError) return res.status(503).json({ status: 'error', message: err.message })
   // express.json() and friends attach their own client-error status (400 on malformed JSON,

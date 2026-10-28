@@ -17,7 +17,7 @@ const REDUCED_EXIT_MS = 150
 
 const STATE = { top: 'current', done: 'approved', skip: 'skipped', '': 'not reviewed' } as const
 
-export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specIds, onSpecRef, flash }: {
+export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specIds, onSpecRef, flash, readOnly = false }: {
   tasks: Task[]
   done: Set<number>
   setDone: Dispatch<SetStateAction<Set<number>>>
@@ -28,8 +28,11 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
   onSpecRef: (id: string) => void
   /** tasks just changed through the API (App clears it once the flash has played) */
   flash?: { indices: Set<number>; n: number } | null
+  /** someone else's project: a viewer — ← → step through the cards; nothing to approve, skip or undo */
+  readOnly?: boolean
 }) {
   const [queue, setQueue] = useState<number[]>([])
+  const [cursor, setCursor] = useState(0) // the viewer's position; the review queue is unused when readOnly
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
   const [history, setHistory] = useState<{ index: number; dir: Dir; wasDone: boolean }[]>([])
   const [dx, setDx] = useState(0)
@@ -55,12 +58,13 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
 
   useEffect(() => () => clearTimeout(commitTimer.current), [])
 
-  const top = queue[0]
+  const top = readOnly ? (tasks.length ? Math.min(cursor, tasks.length - 1) : undefined) : queue[0]
+  const step = (by: number) => setCursor(c => Math.max(0, Math.min(tasks.length - 1, c + by)))
 
   useEffect(() => { onTopChange?.(top ?? null) }, [top])
 
   function commit(dir: Dir) {
-    if (top === undefined || leaving) return
+    if (readOnly || top === undefined || leaving) return
     setLeaving(dir)
     // skip means "not approved", so skipping an approved card (reached via the rail) un-approves it
     if (dir === 'right') setDone(prev => new Set(prev).add(top))
@@ -73,7 +77,7 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
   }
 
   function undo() {
-    if (history.length === 0 || leaving) return
+    if (readOnly || history.length === 0 || leaving) return
     const last = history[history.length - 1]
     setHistory(h => h.slice(0, -1))
     // restore what the card was before this swipe, not "unapproved" — it may have been approved already
@@ -84,6 +88,7 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
   }
 
   function jumpTo(i: number) {
+    if (readOnly) { setCursor(i); return }
     if (i === top || leaving) return
     const swipedDir = history.find(x => x.index === i)?.dir
     // revisiting keeps an approval; only a pending skip is cleared so the card counts as unreviewed
@@ -97,13 +102,18 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
+      if (readOnly) {
+        if (e.key === 'ArrowRight') { e.preventDefault(); step(1) }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
+        return
+      }
       if (e.key === 'ArrowRight') { e.preventDefault(); commit('right') }
       if (e.key === 'ArrowLeft') { e.preventDefault(); commit('left') }
       if (e.key === 'ArrowUp' || e.key === 'z') { e.preventDefault(); undo() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [top, leaving, done, history])
+  }, [top, leaving, done, history, readOnly, tasks.length])
 
   function onPointerDown(e: React.PointerEvent) {
     if (leaving || e.button !== 0 || (e.target as Element).closest('button, a')) return
@@ -192,7 +202,7 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
   const throwX = reduced ? 0 : leaving === 'right' ? Math.max(EXIT_MIN, dx + 400) : leaving === 'left' ? Math.min(-EXIT_MIN, dx - 400) : 0
   const enterX = entering === 'right' ? EXIT_MIN : entering === 'left' ? -EXIT_MIN : 0
   const x = leaving ? throwX : entering ? enterX : dx
-  const ghosts = queue.slice(1, 3)
+  const ghosts = readOnly ? tasks.map((_, i) => i).slice(top + 1, top + 3) : queue.slice(1, 3)
 
   return (
     <div className="focus">
@@ -201,9 +211,9 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
         {ghosts.map((i, k) => <div key={i} className={`card ghost g${k + 1}`} aria-hidden="true" />).reverse()}
         <article
           key={top}
-          className={`card top${dragging ? ' dragging' : ''}${flash?.indices.has(top) ? ' flash' : ''}`}
+          className={`card top${readOnly ? ' viewer' : ''}${dragging ? ' dragging' : ''}${flash?.indices.has(top) ? ' flash' : ''}`}
           aria-label={`Task ${top + 1}: ${t.title}`}
-          onPointerDown={onPointerDown}
+          onPointerDown={readOnly ? undefined : onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
@@ -230,12 +240,20 @@ export function CardViewer({ tasks, done, setDone, onTopChange, taskRefs, specId
           </div>
         </article>
       </div>
+      {readOnly ? (
+        <div className="deck-actions">
+          <button className="btn btn-ghost lg lead" onClick={() => step(-1)} disabled={top === 0}><Icon name="chev-l" />Previous</button>
+          <span className="hint">Read-only · approvals belong to the owner · <kbd>←</kbd> <kbd>→</kbd> to move</span>
+          <button className="btn btn-outline lg trail" onClick={() => step(1)} disabled={top === tasks.length - 1}>Next<Icon name="chev-r" /></button>
+        </div>
+      ) : (
       <div className="deck-actions">
         <button className="btn btn-ghost lg lead" onClick={undo} disabled={history.length === 0}><Icon name="undo" />Undo</button>
         <span className="hint">Drag the card or press <kbd>←</kbd> <kbd>→</kbd> · <kbd>Z</kbd> undo</span>
         <button className="btn btn-skip lg lead" onClick={() => commit('left')}><Icon name="x" />Skip</button>
         <button className="btn btn-approve lg lead" onClick={() => commit('right')}><Icon name="check" />Approve</button>
       </div>
+      )}
     </div>
   )
 }

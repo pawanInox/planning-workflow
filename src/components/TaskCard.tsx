@@ -171,7 +171,7 @@ export function TaskBody({ task, tasks, done, refs = [], specIds, onJump, onSpec
 }
 
 /** One List-view row: a checkbox, the title (expands the detail and points the side pane at it). */
-export function TaskRow({ task, index, checked, selected, expanded, flash = false, onToggle, onOpen, children }: {
+export function TaskRow({ task, index, checked, selected, expanded, flash = false, readOnly = false, onToggle, onOpen, children }: {
   task: Task
   index: number
   checked: boolean
@@ -179,6 +179,8 @@ export function TaskRow({ task, index, checked, selected, expanded, flash = fals
   expanded: boolean
   /** just changed through the API */
   flash?: boolean
+  /** a reader sees the owner's approval but cannot change it */
+  readOnly?: boolean
   onToggle: () => void
   onOpen: () => void
   children: ReactNode
@@ -186,7 +188,8 @@ export function TaskRow({ task, index, checked, selected, expanded, flash = fals
   return (
     <div className={`trow${selected ? ' sel' : ''}${flash ? ' flash' : ''}`} data-task={index} data-done={checked}>
       <div className="row-line">
-        <button className="check" role="checkbox" aria-checked={checked} onClick={onToggle} aria-label={`Approve ${task.title}`}>
+        <button className="check" role="checkbox" aria-checked={checked} disabled={readOnly} onClick={onToggle}
+          aria-label={readOnly ? `${task.title}: ${checked ? 'approved' : 'not approved'} by the owner` : `Approve ${task.title}`}>
           <Icon name="check" />
         </button>
         <button className="row-main" aria-expanded={expanded} onClick={onOpen}>

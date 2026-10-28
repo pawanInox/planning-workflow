@@ -3,14 +3,16 @@
 Paste a markdown plan → review tasks card-by-card (Focus deck or List) → hand approved tasks to an agent via a copied prompt. Projects and tasks persist in MongoDB.
 
 - Frontend: React + Vite (`src/`), dev server on 5173, proxies `/api` to the API. Follow the `vite-react-best-practices` skill (`.agents/skills/`). In this repo that means: pages in `src/pages/` (lazy-loaded), shared UI in `src/components/`, ALL server calls in `src/lib/api.ts` (no raw `fetch` in components). Deliberate deviation: no React Query/SWR — plain fetch wrappers in `lib/api.ts` until caching/retries matter. Styles live in `src/theme.css`: components reference only the `--color-*` semantic tokens (better-colors), never the primitive ramps; polish follows better-ui (shadow rings, 0.96 press scale, motion gated on reduced-motion).
-- API: Express (`server/`), port 3001 (`PORT` env). Follow the `express-typescript-api-best-practices` skill (`.agents/skills/`). In this repo: `v1/routes → controllers → services → repositories → models` under `server/src/`, Zod schemas in `schemas/` applied via the `validate` middleware, central `error-handler`, envelope responses (below); `server/index.ts` is the composition root. Deliberate deviations: no Swagger (this file is the API doc), no JWT/auth (single-user tool), no Mongo transactions (standalone Mongo doesn't support them).
+- API: Express (`server/`), port 3001 (`PORT` env). Follow the `express-typescript-api-best-practices` skill (`.agents/skills/`). In this repo: `v1/routes → controllers → services → repositories → models` under `server/src/`, Zod schemas in `schemas/` applied via the `validate` middleware, central `error-handler`, envelope responses (below); `server/index.ts` is the composition root. Deliberate deviations: no Swagger (this file is the API doc), auth is Google sign-in (server-side OAuth via `google-auth-library`) with an httpOnly `yd_session` cookie for the browser and `Authorization: Bearer ydk_…` personal API tokens for agents — no JWTs, every session and token is a revocable Mongo row, no Mongo transactions (standalone Mongo doesn't support them).
 - Shared parser/serializer: `shared/parse.ts` (`parsePlan` ⇄ `planToMarkdown`). Also in `shared/`: `groups.ts` (`groupTasks` — splits tasks into independent tracks, the connected components of the `dependsOn` graph, so no track depends on another).
-- Run: `npm run dev` (needs `MONGODB_URI` in `.env` for persistence) or `docker compose up --build` (app on 5173, Mongo browsable on 27019).
+- Run: `npm run dev` (needs `MONGODB_URI` in `.env` for persistence, plus `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `PUBLIC_URL` for sign-in — without them every app screen stops at the sign-in page and `/auth/google` sends the browser back there with a "not set up" note; `/auth/me`, logout and existing tokens keep working) or `docker compose up --build` (app on 5173, Mongo browsable on 27019).
 - Test: `npm test` (node:test via tsx). Typecheck: `npx tsc --noEmit`.
 
 ## Project/task API
 
 Base URL: `http://localhost:3001/api/v1` with `npm run dev`. With `docker compose up`, the api container is not host-published — go through the web proxy instead: `http://localhost:5173/api/v1/...`. If unsure which is running, try 3001 first and fall back to 5173.
+
+**Auth** (every `/projects` route): send `-H "Authorization: Bearer $YAK_DAI_TOKEN"` — a personal API token the user creates in the app (sidebar account menu → API tokens); the browser uses its session cookie instead. No session or token → **401**. Any signed-in caller may `GET` any project by id; **every write is owner-only** (`PUT`/`DELETE` a project, `POST`/`PATCH`/`DELETE` a task) → **403** `only the owner can change this project` otherwise, including projects saved before sign-in existed until `scripts/assign-owner.ts <email>` gives them an owner. `GET /projects` lists only the caller's own projects; a project is created owned by the caller (a body `ownerId` is ignored). `GET /projects/:id` also returns `owner: { id, name, avatarUrl } | null` (never the email) and `canEdit`. Auth routes under `/api/v1/auth`: `GET /google?returnTo=`, `GET /google/callback`, `GET /me`, `POST /logout`, and `GET`/`POST`/`DELETE /tokens[/:id]` (session-only — a token cannot manage tokens).
 
 **Response envelope** (every endpoint): success → `{ "status": "ok", "message": string, "data": ... }`; error → `{ "status": "error", "message": string, "details"?: [{ field, message }] }`. The payloads below are what arrives in `data`.
 
@@ -35,6 +37,7 @@ Use this to read or edit a user's plan while they review it in the app — the r
 
 ```bash
 curl -X PATCH localhost:3001/api/v1/projects/$PID/tasks/$TID \
+  -H "Authorization: Bearer $YAK_DAI_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"todo":"New concrete steps here."}'
 ```

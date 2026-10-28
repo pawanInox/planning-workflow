@@ -33,7 +33,7 @@ npm install
 npm run dev            # vite on 5173 + API on 3001
 ```
 
-Without `MONGODB_URI` the app still works for a single session (paste → review); saving, the project list, and reopening are disabled gracefully.
+Every app screen needs a signed-in Google account (see [Google sign-in](#google-sign-in) below); only the homepage is public. Without `MONGODB_URI` there is nowhere to keep users or projects, so `/auth` and `/projects` answer 503.
 
 ### Where things live in the browser
 
@@ -48,9 +48,28 @@ Without `MONGODB_URI` the app still works for a single session (paste → review
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `MONGODB_URI` | for persistence | e.g. `mongodb://localhost:27019/plan-to-linear` |
+| `MONGODB_URI` | yes | e.g. `mongodb://localhost:27019/plan-to-linear` |
+| `GOOGLE_CLIENT_ID` | for sign-in | OAuth client (type "Web application") from Google Cloud console |
+| `GOOGLE_CLIENT_SECRET` | for sign-in | that client's secret |
+| `PUBLIC_URL` | for sign-in | the origin the browser uses, default `http://localhost:5173` — builds the OAuth redirect URI and turns on `Secure` cookies when it is https |
 | `PORT` | no | API port (default 3001) |
 | `API_ORIGIN` | no | where Vite proxies `/api` (default `http://localhost:3001`) |
+
+### Google sign-in
+
+1. In Google Cloud console → APIs & Services → Credentials, create an **OAuth client ID** of type **Web application**.
+2. Add the authorized redirect URI `http://localhost:5173/api/v1/auth/google/callback` (that is `${PUBLIC_URL}/api/v1/auth/google/callback`). Vite (dev) and `vite preview` (docker) both proxy `/api`, so the one URI covers `npm run dev` and `docker compose up`.
+3. Put `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `PUBLIC_URL` in `.env` (dev), or export them before `docker compose up --build` (compose passes them to the api container).
+
+Any Google account can sign in. Each project belongs to whoever created it: the owner sees it in their sidebar and is the only one who can approve, edit or delete it; anyone else signed in can open it read-only from its link.
+
+**Upgrading an existing database:** projects saved before sign-in existed have no owner, so they are read-only for everyone until you run, once, after signing in:
+
+```bash
+MONGODB_URI=mongodb://localhost:27019/plan-to-linear npx tsx scripts/assign-owner.ts you@example.com
+```
+
+**Tokens for agents:** `/yak-dai`, `/yang-mai-sure` and the curl examples in CLAUDE.md call the API without a browser. Create a token in the app (sidebar account menu → **API tokens**; it is shown once), then `export YAK_DAI_TOKEN=ydk_…` — the skills send it as `Authorization: Bearer`, and projects they create belong to you. Revoke a token from the same dialog.
 
 ## Plan format
 
@@ -97,6 +116,7 @@ REST under `/api/v1` with a standard envelope — success `{ "status": "ok", "me
 ```bash
 # reword a task while someone reviews it — the app picks it up within 3 s
 curl -X PATCH localhost:3001/api/v1/projects/$PID/tasks/$TID \
+  -H "Authorization: Bearer $YAK_DAI_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"todo":"New concrete steps."}'
 ```
@@ -117,9 +137,10 @@ Full endpoint reference lives in [CLAUDE.md](CLAUDE.md) (which doubles as the AP
 src/                      # React + Vite
 ├── App.tsx               # state container + lazy page switch (no router lib; URL mirrors state)
 ├── theme.css             # tokens (two-tier: primitives → --color-* roles) + all styles
-├── pages/                # Home, Input, Review — one lazy chunk each
+├── pages/                # Home, SignIn, Input, Review — one lazy chunk each
 ├── components/
-│   ├── Sidebar.tsx       # project list, pagination, delete dialog
+│   ├── Sidebar.tsx       # project list, pagination, delete dialog, account menu
+│   ├── TokensDialog.tsx  # personal API tokens: create (shown once), list, revoke
 │   ├── TaskCard.tsx      # task body, List-view row, copy-prompt buttons
 │   ├── CardViewer.tsx    # the Focus deck (drag, throw, undo)
 │   ├── DiagramPanel.tsx  # mermaid render + zoom/pan + per-task highlight
@@ -156,7 +177,7 @@ npx tsc --noEmit   # typecheck
 npm run build      # production bundle
 ```
 
-45 tests, no framework — `node:test` run through `tsx`.
+Tests, no framework — `node:test` run through `tsx`.
 
 ## Exposing it temporarily
 
@@ -166,4 +187,4 @@ npm run build      # production bundle
 cloudflared tunnel --url http://localhost:5173
 ```
 
-That URL is public and the app has no authentication, so anything in your MongoDB is reachable by whoever holds the link.
+That URL is public. Google sign-in does **not** work through a quick tunnel: its random `*.trycloudflare.com` hostname cannot be registered as an OAuth redirect URI, so visitors reach only the homepage and the sign-in screen. For sign-in over a tunnel, use a named tunnel or a real domain, register `https://<host>/api/v1/auth/google/callback`, and set `PUBLIC_URL=https://<host>`.
